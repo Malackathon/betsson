@@ -146,11 +146,12 @@ class LobbyPage:
         """Fail fast, with the fix, when a reused saved session turned out expired or rejected."""
         try:
             self._balance_locator(timeout_ms)
-        except Exception:
+        except Exception as exc:
             raise RuntimeError(
                 f"[{self._agent_id}] Logged-in header (balance) not found with the saved session: it may be "
                 f"expired/rejected, or the 'balance_display' selector in config/markets.json does not match this "
-                f"site. Re-save the session with: python scripts/save_session.py {self._agent_id}"
+                f"site. Re-save the session with: python scripts/save_session.py {self._agent_id}. "
+                f"Detail: {str(exc)[:600]}"
             ) from None
         self._logged_in = True
 

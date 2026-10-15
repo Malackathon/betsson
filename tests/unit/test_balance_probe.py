@@ -62,3 +62,12 @@ def test_fallback_ignores_numbers_without_a_currency(page):
     _page_with(page, "<span>12</span><span>Casino 2026</span>")
     with pytest.raises(LookupError):
         find_balance_locator(page, ".nope", timeout_ms=300)
+
+
+def test_failure_message_lists_header_strings_but_never_emails(page):
+    _page_with(page, "<span>Casino 2026</span><span>player42@mail.com</span><span>Bonus 5</span>")
+    with pytest.raises(LookupError) as exc:
+        find_balance_locator(page, ".nope", timeout_ms=300)
+    message = str(exc.value)
+    assert "Casino 2026" in message
+    assert "@" not in message

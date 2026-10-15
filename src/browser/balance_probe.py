@@ -37,6 +37,25 @@ _PROBE_JS = """
 """
 
 
+_HEADER_TEXTS_JS = r"""
+([maxTop, maxHeight, limit]) => [...document.querySelectorAll('body *')]
+  .filter(e => { const r = e.getBoundingClientRect();
+    return r.width && r.height && r.top <= maxTop && r.bottom >= 0 && r.height <= maxHeight; })
+  .map(e => (e.innerText || '').trim().replace(/\s+/g, ' '))
+  .filter(t => t && t.length <= 30 && /[0-9€]/.test(t) && !t.includes('@'))
+  .filter((t, i, all) => all.indexOf(t) === i)
+  .slice(0, limit)
+"""
+
+
+def _header_text_sample(page: Any, limit: int = 12) -> list[str]:
+    """Short header strings with digits/currency, e-mail-like ones excluded (privacy)."""
+    try:
+        return page.evaluate(_HEADER_TEXTS_JS, [HEADER_MAX_TOP_PX, HEADER_MAX_HEIGHT_PX, limit])
+    except Exception:
+        return []
+
+
 def find_balance_locator(page: Any, configured_selector: str, timeout_ms: int = 15_000) -> Any:
     """Locator of the balance element: the configured one if visible, else a header heuristic.
 
@@ -53,4 +72,7 @@ def find_balance_locator(page: Any, configured_selector: str, timeout_ms: int = 
         probed = page.locator(f"[{PROBE_ATTRIBUTE}='1']").first
         logger.info("Balance found by header probe (update 'balance_display' in config/markets.json)")
         return probed
-    raise LookupError("No balance element found: configured selector absent and no money-like element in the header")
+    raise LookupError(
+        "No balance element found: configured selector absent and no money-like element in the header. "
+        f"Header strings with digits/currency: {_header_text_sample(page)}"
+    )
