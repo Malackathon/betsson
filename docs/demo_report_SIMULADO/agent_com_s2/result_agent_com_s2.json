@@ -1,0 +1,75 @@
+{
+  "agent_id": "agent_com_s2",
+  "market": "COM",
+  "scenario": 2,
+  "checks": [
+    {
+      "id": "S2.01",
+      "name": "Precondición: saldo < apuesta",
+      "expected": "saldo < apuesta",
+      "observed": "saldo=0.05, apuesta=0.20",
+      "detail": "Cuenta preparada (saldo según el servidor)",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.02",
+      "name": "El giro es rechazado (no hay giro pagado)",
+      "expected": "True",
+      "observed": "True",
+      "detail": "estado del giro=no_traffic; saldo servidor antes=0.05, después=0.05",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.03",
+      "name": "Mensaje de saldo insuficiente visible",
+      "expected": "Texto de mensaje no vacío",
+      "observed": "Insufficient funds. Please deposit.",
+      "detail": "Mensaje leído en pantalla: 'Insufficient funds. Please deposit.'",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.04",
+      "name": "Mensaje en el idioma del mercado",
+      "expected": "any of: ['insufficient', 'funds']",
+      "observed": "matched: ['insufficient', 'funds']",
+      "detail": "Found keyword(s) ['insufficient', 'funds'] in message: 'Insufficient funds. Please deposit.'",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.05",
+      "name": "Moneda mostrada = mercado",
+      "expected": "€",
+      "observed": "screen currency '€', expected '€'",
+      "detail": "screen currency '€', expected '€'",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.06",
+      "name": "Saldo in-game sin cambios",
+      "expected": "0.05",
+      "observed": "0.05",
+      "detail": "Balance unchanged: 0.05",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.06v",
+      "name": "Saldo visible == saldo del servidor",
+      "expected": "pantalla == servidor",
+      "observed": "screen 0.05 == server 0.05",
+      "detail": "screen 0.05 == server 0.05",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.07",
+      "name": "Saldo Betsson sin cambios",
+      "expected": "0.05",
+      "observed": "0.05",
+      "detail": "Balance unchanged: 0.05",
+      "status": "PASS"
+    }
+  ],
+  "evidence_dir": "docs\\demo_report_SIMULADO\\agent_com_s2\\evidence",
+  "video_path": null,
+  "started_at": "2026-10-15T17:55:33.792817Z",
+  "finished_at": "2026-10-15T17:56:11.792817Z"
+}

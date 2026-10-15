@@ -28,7 +28,6 @@ El código está organizado en módulos `core`, `vision`, `orchestrator` y `agen
 | **Giro (scenario 1)** | ✅ | `GameFlow.execute_spin_cycle` hace click, detecta movimiento y estabilidad, y devuelve resultados. |
 | **Insufficient‑funds (scenario 2)** | ✅ | Se detecta el banner, se extrae el mensaje y el idioma, y el test pasa. |
 | **Reportes** | ✅ | `generate_html_report` crea `artifacts/report.html` con tabla de resultados y reproductor de vídeo. |
-| **Ejecución paralela** | ✅ | `pytest -m e2e -n 4` lanza los 4 agentes simultáneamente y genera 4 videos independientes. |
 | **Cobertura de pruebas** | ✅ | 170 unit tests + 4 E2E → **100 %** de los módulos críticos. |
 
 ---
@@ -64,12 +63,33 @@ copy .env.example .env
 # Opcional: HEADLESS=false  (para ver el navegador)
 ```
 ### 3️⃣ (Opcional) Guardar cookie
-1. Inicia sesión en Betsson con el navegador normal. 
-2. Exporta la cookie `sessionid` (u otro que mantenga la sesión) a `cookies.json` (ver bloque *Formato JSON* arriba).
-3. Exporta la variable de entorno:
-```powershell
-$env:PLAYWRIGHT_STORAGE_STATE = "betsson_cookie.json"
-```
+
+El login automático lo bloquea el antifraude de Betsson, así que se reutiliza una sesión iniciada a mano.
+
+1. Inicia sesión en Betsson (`betsson.es`) con el navegador normal y **no cierres sesión**.
+2. Exporta **todas** las cookies de Betsson a `cookies.json` (en la raíz del repo; está ignorado por git) con una extensión como *Cookie-Editor* → *Export → JSON*.
+3. En esa misma pestaña abre la consola del navegador (`F12` → *Console*) y ejecuta:
+
+   ```js
+   copy(JSON.stringify({origin: location.origin, localStorage: {...localStorage}, sessionStorage: {...sessionStorage}}))
+   ```
+
+   Pega el resultado del portapapeles en un archivo `storage.json` (raíz del repo, también ignorado por git).
+4. Importa la sesión y comprueba que está fresca:
+
+   ```bash
+   python scripts/import_cookies.py agent_com_s1 cookies.json storage.json
+   python scripts/check_session.py agent_com_s1
+   ```
+
+5. Lanza el test enseguida (las cookies de login caducan en ~45-60 min):
+
+   ```bash
+   python -m pytest tests/test_scenario_1_spin.py -k com_s1 -o addopts="" -s -o log_cli=true -o log_cli_level=INFO
+   ```
+
+> ⚠️ `cookies.json` y `storage.json` equivalen a tu contraseña de sesión: no los subas ni los compartas, y bórralos al terminar.
+
 ### 4️⃣ Ejecutar los tests
 | Acción | Comando | Qué hace |
 |--------|---------|----------|
@@ -79,18 +99,83 @@ $env:PLAYWRIGHT_STORAGE_STATE = "betsson_cookie.json"
 | **Scenario 1 – giro real** | `py -m pytest tests/test_scenario_1_spin.py -k "com_s1" -s` | Ejecuta un spin que consume saldo. |
 | **Todos los agentes en paralelo** | `py -m pytest -m e2e -n 4 -s` | Lanza los 4 sub‑agentes simultáneamente. |
 ### 5️⃣ Encontrar los resultados
-- **JSON de resultados:** `artifacts/result_<agent_id>.json` 
-- **Reporte HTML:** `artifacts/report.html` (abre en cualquier navegador). |
 
+**Ejecución real** (se generan en `artifacts/`, que git ignora):
+
+| Qué | Dónde |
+|-----|-------|
+| Reporte HTML (tabla de checks, abrir en cualquier navegador) | `artifacts/report.html` |
+| Resumen en Markdown | `artifacts/report.md` |
+| Resultado consolidado de los 4 agentes | `artifacts/master_report.json` |
+| Resultado de un agente | `artifacts/<agent_id>/result_<agent_id>.json` |
+| Capturas de evidencia | `artifacts/<agent_id>/evidence/` |
+| Vídeo de la sesión | `artifacts/<agent_id>/video/` |
+| Tráfico de red del juego (sin cookies ni tokens) | `artifacts/<agent_id>/network/game_transactions.json` |
+
+**Reporte de ejemplo (SIMULADO, datos ficticios)** — está versionado en el repositorio para ver cómo se ve un informe con aciertos y un fallo detectado:
+
+| Qué | Dónde |
+|-----|-------|
+| Reporte HTML de ejemplo | [`docs/demo_report_SIMULADO/report.html`](docs/demo_report_SIMULADO/report.html) |
+| Resumen en Markdown | [`docs/demo_report_SIMULADO/report.md`](docs/demo_report_SIMULADO/report.md) |
+| Log con el diagnóstico del fallo | [`docs/demo_report_SIMULADO/test_run.log`](docs/demo_report_SIMULADO/test_run.log) |
+
+> ⚠️ Es una **simulación**: los datos son ficticios (no son resultados reales de Betsson). Lo real es la lógica de comprobación (S1.xx / S2.xx). En el ejemplo, `agent_pe_s1` falla en S1.09 y S1.10 a propósito, para demostrar que el sistema detecta errores. Para regenerarlo:
+>
+> ```bash
+> python scripts/simulate_report.py docs/demo_report_SIMULADO
+> ```
+
+### 6️⃣ Logs de la ejecución
+
+| Log | Dónde | Cuándo es útil |
+|-----|-------|----------------|
+| **Log en vivo** (cada paso del bot: sesión, juego, clic, saldo) | Terminal | Seguir la ejecución y ver dónde se queda. |
+| **Log a archivo** | `artifacts/run.log` (si lo pides, ver abajo) | Guardar el log completo para compartirlo o revisarlo después. |
+| **Diagnóstico por agente** (resumen + detalle de cada fallo) | `artifacts/test_run.log` (se escribe al terminar cada ejecución de pytest) | Entender qué check falló y por qué. |
+| **Tráfico de red del juego** (qué peticiones hizo, sin cookies ni tokens) | `artifacts/<agent_id>/network/game_transactions.json` y `traffic_overview.json` | Si el giro no se reconoce, ver a qué servidor habla el juego. |
+| **Captura de dónde falló** | `artifacts/<agent_id>/evidence/game_phase_failure.png` y `header_balance_not_found.png` | Ver qué había en pantalla cuando falló. |
+
+**Log en vivo en la terminal:**
+
+```bash
+python -m pytest tests/test_scenario_1_spin.py -k com_s1 -o addopts="" -s -o log_cli=true -o log_cli_level=INFO
+```
+
+**Guardarlo además en un archivo** (las mismas opciones, más `log_file`):
+
+```bash
+python -m pytest tests/test_scenario_1_spin.py -k com_s1 -o addopts="" -s -o log_cli=true -o log_cli_level=INFO -o log_file=artifacts/run.log -o log_file_level=INFO
+```
+
+**Qué buscar en el log:**
+
+| Línea | Qué significa |
+|-------|---------------|
+| `Reusing saved session ... (automated login skipped)` | Está usando la sesión importada. |
+| `Session checkpoint '...': logged in` | La sesión sigue activa. `SESSION LOST` indica que se perdió en ese punto. |
+| `Balance stable at ... (3 reads)` | Leyó el saldo de Betsson. |
+| `Click N produced no spin request; re-locating the Spin button` | El clic no generó un giro y se vuelve a buscar el botón. |
+| `Using the stored, previously verified Spin location (no AI call)` | Usa la posición del botón guardada de una ejecución anterior. |
+| `No spin request recognised. The game's recent requests were: [...]` | No se detectó el giro; la lista dice a qué habla el juego. |
+| `Game phase failed. Recent events ...` | Fallo al abrir el juego, con las últimas navegaciones y errores HTTP. |
+
+> 🔒 **Privacidad:** los errores sustituyen el usuario y la contraseña por `***`, y los logs de red guardan solo `host/ruta` (nunca parámetros, cookies ni tokens). Aun así, `cookies.json` y `storage.json` no se comparten nunca.
+>
+> Ejemplo de `test_run.log` (de la simulación, datos ficticios): [`docs/demo_report_SIMULADO/test_run.log`](docs/demo_report_SIMULADO/test_run.log)
 
 ## 📦 Artefactos generados por cada ejecución
 ```
 artifacts/
 ├─ report.html               # reporte interactivo con tabla y video embed
 ├─ report.md                 # resumen markdown del reporte
+├─ test_run.log              # diagnóstico por agente y detalle de cada fallo
+├─ run.log                   # (opcional) log completo si usas -o log_file=artifacts/run.log
 ├─ agent_com_s1/
 │   ├─ result_agent_com_s1.json
-│   └─ screenshots/ …
+│   ├─ evidence/ …
+│   ├─ video/ …
+│   └─ network/ …
 ├─ agent_pe_s2/ …
 └─ … (otros agentes)
 ```

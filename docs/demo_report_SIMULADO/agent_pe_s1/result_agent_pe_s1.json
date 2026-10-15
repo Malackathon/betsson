@@ -1,0 +1,115 @@
+{
+  "agent_id": "agent_pe_s1",
+  "market": "PE",
+  "scenario": 1,
+  "checks": [
+    {
+      "id": "S1.01",
+      "name": "Saldo Betsson antes legible",
+      "expected": "Decimal > 0",
+      "observed": "100.00",
+      "detail": "Saldo en cabecera (DOM): 100.00",
+      "status": "PASS"
+    },
+    {
+      "id": "S1.02",
+      "name": "Juego Pragmatic abierto en Real Play",
+      "expected": "HUD visible con CREDIT/BET/WIN",
+      "observed": "HUD legible",
+      "detail": "Lectura visual de la captura tomada al liquidarse la ronda",
+      "status": "PASS"
+    },
+    {
+      "id": "S1.03",
+      "name": "Moneda mostrada = mercado",
+      "expected": "currency",
+      "observed": "screen currency 'S/', expected 'S/'",
+      "detail": "screen currency 'S/', expected 'S/'",
+      "status": "PASS"
+    },
+    {
+      "id": "S1.04",
+      "name": "Apuesta y saldo in-game legibles",
+      "expected": "credit y bet legibles en pantalla",
+      "observed": "legibles",
+      "detail": "balance: screen shows 100.00, server says 99.80 | bet: screen 0.20 == server 0.20",
+      "status": "PASS"
+    },
+    {
+      "id": "S1.08",
+      "name": "Apuesta mostrada = apuesta usada",
+      "expected": "apuesta en pantalla == apuesta cobrada por el servidor",
+      "observed": "screen 0.20 == server 0.20",
+      "detail": "screen 0.20 == server 0.20",
+      "status": "PASS"
+    },
+    {
+      "id": "S1.05",
+      "name": "El giro empezó",
+      "expected": "True",
+      "observed": "True",
+      "detail": "La petición de giro llegó al servidor del juego (red)",
+      "status": "PASS"
+    },
+    {
+      "id": "S1.06",
+      "name": "El giro terminó",
+      "expected": "True",
+      "observed": "True",
+      "detail": "El servidor liquidó la ronda (na=s)",
+      "status": "PASS"
+    },
+    {
+      "id": "S1.05v",
+      "name": "El juego reaccionó en pantalla",
+      "expected": "cambio visual >= 0.003",
+      "observed": "0.0132",
+      "detail": "Diferencia entre la captura previa al giro y la tomada al liquidarse la ronda (sin IA)",
+      "status": "PASS"
+    },
+    {
+      "id": "S1.07",
+      "name": "No se disparó bonus/free spins",
+      "expected": "False",
+      "observed": "False",
+      "detail": "Giro base estándar (0 reintento(s) por bonus)",
+      "status": "PASS"
+    },
+    {
+      "id": "S1.09n",
+      "name": "Servidor: saldo reconcilia (red)",
+      "expected": "saldo_después = antes − apuesta + premio",
+      "observed": "True",
+      "detail": "antes=100.00, apuesta=0.20, premio=0.00, después=99.80",
+      "status": "PASS"
+    },
+    {
+      "id": "S1.09",
+      "name": "Saldo in-game reconcilia",
+      "expected": "99.80",
+      "observed": "100.00",
+      "detail": "Reconciliation FAILED: expected = before (100.00) - bet (0.20) + prize (0.00) = 99.80; observed after = 100.00; diff = 0.20 (tolerance = 0.01)",
+      "status": "FAIL"
+    },
+    {
+      "id": "S1.10",
+      "name": "Saldo Betsson reconcilia",
+      "expected": "99.80",
+      "observed": "100.00",
+      "detail": "Reconciliation FAILED: expected = before (100.00) - bet (0.20) + prize (0) = 99.80; observed after = 100.00; diff = 0.20 (tolerance = 0.01)",
+      "status": "FAIL"
+    },
+    {
+      "id": "S1.11",
+      "name": "Moneda de Betsson = mercado",
+      "expected": "S/",
+      "observed": "S/",
+      "detail": "Moneda en cabecera Betsson (DOM): 'S/'",
+      "status": "PASS"
+    }
+  ],
+  "evidence_dir": "docs\\demo_report_SIMULADO\\agent_pe_s1\\evidence",
+  "video_path": null,
+  "started_at": "2026-10-15T17:56:13.792817Z",
+  "finished_at": "2026-10-15T17:56:51.792817Z"
+}

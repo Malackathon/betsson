@@ -132,6 +132,9 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     md_path = artifacts_dir / "report.md"
     md_path.write_text(generate_markdown_summary(master_report), encoding="utf-8")
 
+    # 4. Save test_run.log (plain-text diagnosis per agent, with details of every failure)
+    master_report.write_log(artifacts_dir / "test_run.log")
+
     logger.info(
         "pytest_sessionfinish: Consolidated %d reports into %s and %s",
         len(reports),
