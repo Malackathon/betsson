@@ -160,7 +160,7 @@ class GameFlow:
         assert self._lobby is not None and self._canvas is not None
         outcome = SpinOutcome(status=SpinStatus.ERROR)
 
-        outcome.balance_before = self._lobby.read_balance_stable()
+        outcome.balance_before, _ = self._read_betsson()
         if self._callbacks.on_balance_read:
             self._callbacks.on_balance_read(outcome.balance_before)
 
@@ -176,8 +176,7 @@ class GameFlow:
         self._apply_spin_run(outcome, run)
         outcome.status = self._status_for_scenario_1(run)
 
-        outcome.balance_after = self._lobby.read_balance_stable()
-        outcome.currency_observed = self._lobby.read_currency_from_header()
+        outcome.balance_after, outcome.currency_observed = self._read_betsson()
         outcome.network_evidence = self._save_network_evidence()
         if self._callbacks.on_spin_end:
             self._callbacks.on_spin_end(outcome)
@@ -194,7 +193,7 @@ class GameFlow:
 
         self._monitor.mark()  # drain pending responses so last_balance is current
         net_before = self._monitor.last_balance  # in-game balance per the server, BEFORE the attempt
-        outcome.balance_before = self._lobby.read_balance_stable()
+        outcome.balance_before, _ = self._read_betsson()
         if self._callbacks.on_balance_read:
             self._callbacks.on_balance_read(outcome.balance_before)
 
@@ -230,8 +229,7 @@ class GameFlow:
             if msg and self._callbacks.on_insufficient_funds:
                 self._callbacks.on_insufficient_funds(msg, location)
 
-        outcome.balance_after = self._lobby.read_balance_stable()
-        outcome.currency_observed = self._lobby.read_currency_from_header()
+        outcome.balance_after, outcome.currency_observed = self._read_betsson()
         final_screenshot = self._canvas.take_game_screenshot("s2_final")
         outcome.screenshots.append(final_screenshot)
         outcome.final_screenshot = outcome.final_screenshot or final_screenshot
@@ -246,6 +244,26 @@ class GameFlow:
             self._callbacks.on_spin_end(outcome)
         outcome.video_path = self._get_video_path()
         return outcome
+
+    def _read_betsson(self) -> tuple[Decimal, str]:
+        """Betsson wallet balance and currency, read in a fresh lobby tab.
+
+        The in-game header shows the word "Saldo" and the currency but hides the amount, so the
+        wallet is read where it is shown: the lobby. The game tab is brought back to the front
+        afterwards (background tabs throttle the game's animation).
+        """
+        assert self._ctx_game is not None
+        auth_dir = self._artifacts_dir.parent / _AUTH_STATE_DIR_NAME
+        tab = self._ctx_game.new_page()
+        try:
+            reader = LobbyPage(page=tab, market=self._market, agent_id=self._agent_id, auth_state_dir=auth_dir)
+            tab.goto(self._mkt_config.casino_url, timeout=45_000)
+            reader._dismiss_overlays()
+            return reader.read_balance_stable(), reader.read_currency_from_header()
+        finally:
+            tab.close()
+            if self._canvas is not None:
+                self._canvas.page.bring_to_front()
 
     def _apply_spin_run(self, outcome: SpinOutcome, run: SpinRun) -> None:
         """Copy the server-side truth of a spin run into the outcome."""
