@@ -1,7 +1,7 @@
 [
     {
         "domain": ".www.betsson.es",
-        "expirationDate": 1792422927,
+        "expirationDate": 1792424460,
         "hostOnly": false,
         "httpOnly": false,
         "name": "aws-waf-token",
@@ -10,11 +10,11 @@
         "secure": true,
         "session": false,
         "storeId": null,
-        "value": "21c79af2-0cd2-4d06-9926-50318acdf019:HQoAvuJprZ4gAAAA:6hqMrEzH7PfkkUZah98/uRwGDCNgTUEUKRL8eDJESsIZTDxxMlfsrcvb60Kk/Kjo00Sede+nl2EhYlSzZqNR3ddPEYI5cfH7ebPxyZqVygn6rX+dRwmRouuDaRdGU8qIrc6Jf2kTyoz5VxH4SNjeV9eyT3xbEgDLPTouk+VRVfcEP2PfODRqtgwZQRmeaJhmdccvxz0NCJvI33az2ivfqOxixix7F5+AP8vnuN5xhauJbVfXc53P7iInNVNcTtppvxC1PJtwnYlzTFAIA9KAs4MvxIlKfJ4T"
+        "value": "21c79af2-0cd2-4d06-9926-50318acdf019:HQoAtz5prTu5AAAA:LsrdXXjdorf+SgXJ+klgBX+oLTwBbb+kvaFuxCoJmcKjWjOzHD5AAOsQ9GL/ksgffHqgZzuk+EllN9u3UR20bjHhE+Ucm3O0qHJHnVKqR9Cw2vNSQq/QSBGtoZ+VqpQaZaiLbpRgo+eZTkxHI2ZgfcV8kbgjGomoNLrYsD3s/12MC93ugIji+tT+61pS1eMQivYRYHnk6RPsx2tlCmqpFXU4crfsQ6A7S+JbJgqA6o4sVwaerAgkGhiJNeBFi44IVH/0tl0r11fw3qBPqcMYFpVnzNY93n3v"
     },
     {
         "domain": ".betsson.es",
-        "expirationDate": 1792078639.434784,
+        "expirationDate": 1792079159.628462,
         "hostOnly": false,
         "httpOnly": true,
         "name": "gamewebauth",
@@ -23,24 +23,11 @@
         "secure": true,
         "session": false,
         "storeId": null,
-        "value": "ewogICJhbGciOiAiSFMyNTYiLAogICJ0eXAiOiAiSldUIgp9.ewogICJ1c2VySWQiOiAiMDljMmEzNzgtZDkwMS00NjQwLThhYTUtNjlkOGM4ODhhODFiIiwKICAibG9naW5TZXNzaW9uSWQiOiAiYmQyMTI3Y2UtZDViMy00YTg5LWEzMTEtZDAwMDY2Zjg0NDY3IiwKICAianVyaXNkaWN0aW9uIjogIkRnb2oiCn0.hd021Us4fZ6pW3-dj_RcKdv-H0kWx5YIkXAYBTwJxpQ"
-    },
-    {
-        "domain": ".betsson.es",
-        "expirationDate": 1792078960.200829,
-        "hostOnly": false,
-        "httpOnly": false,
-        "name": "FPGSID",
-        "path": "/",
-        "sameSite": "strict",
-        "secure": true,
-        "session": false,
-        "storeId": null,
-        "value": "1.1792077160.1792077434.G-HCC3Z1M864.I-4OK4pLk3kUzBqisJ84Cw"
+        "value": "ewogICJhbGciOiAiSFMyNTYiLAogICJ0eXAiOiAiSldUIgp9.ewogICJ1c2VySWQiOiAiMDljMmEzNzgtZDkwMS00NjQwLThhYTUtNjlkOGM4ODhhODFiIiwKICAibG9naW5TZXNzaW9uSWQiOiAiM2Y1NTE2YjEtYTU3Ny00YjFkLTkwYjUtYWJlYWE0YjM3YzNlIiwKICAianVyaXNkaWN0aW9uIjogIkRnb2oiCn0.DZKRzD3P5oxgd1q75a0o3lxRhee9HC7Vt1iTkGkBa5A"
     },
     {
         "domain": "www.betsson.es",
-        "expirationDate": 1823613442.756818,
+        "expirationDate": 1823614849.837606,
         "hostOnly": true,
         "httpOnly": false,
         "name": "cfidsgib-w-betssones",
@@ -49,24 +36,11 @@
         "secure": true,
         "session": false,
         "storeId": null,
-        "value": "bD0PRa6WjlPffkfN985ZLmbA8n7+z0r+FB+7q2ixNn+w27zpQDrNCUUAjZSs1vUak4k+/KyXPAHr7iHP8/+TFvsnXj+pqnJUiPwT1jpV1cSkK7B179l2aEWOzY7Dj3B9p43PDGhL2Le78eCcmKTKNoFvzGMfhU8laalCg3I="
-    },
-    {
-        "domain": ".betsson.es",
-        "expirationDate": 1823611366,
-        "hostOnly": false,
-        "httpOnly": false,
-        "name": "fs_uid",
-        "path": "/",
-        "sameSite": "strict",
-        "secure": true,
-        "session": false,
-        "storeId": null,
-        "value": "#o-AD9G-eu1#72dcbfd6-738e-4886-8cd1-131faf1ae41f:d7bbea51-56bb-44ff-a1ed-1be4b1104b5d:1792075352145::3#97f0fba1###/1823611366"
+        "value": "w5B+RstXo973hjkWCS+Ku/tlWlMPaOv+T57LNdgJqNVEWl6oecjEx0Uonx4pFEvLhHGf7lWWaJrM1pd3mbuNkofASzE7szyU5SrQFKZTjpHNfy8w7wo9q9e87tUsE46wUHDBP65dwlvTmM7u+4v9ldu+PcxzUaTV6suIzw=="
     },
     {
         "domain": "www.betsson.es",
-        "expirationDate": 1792078042.756655,
+        "expirationDate": 1792079449.837228,
         "hostOnly": true,
         "httpOnly": false,
         "name": "agentroutestate",
@@ -75,11 +49,11 @@
         "secure": true,
         "session": false,
         "storeId": null,
-        "value": "L809VnAL97aLFQh8hJ2YxQ"
+        "value": "XPq-Sw8hU5CstuF24reH_Q"
     },
     {
         "domain": ".betsson.es",
-        "expirationDate": 1823613157.131335,
+        "expirationDate": 1823614856.9342,
         "hostOnly": false,
         "httpOnly": false,
         "name": "data-theme",
@@ -92,58 +66,7 @@
     },
     {
         "domain": ".betsson.es",
-        "expirationDate": 1823613441,
-        "hostOnly": false,
-        "httpOnly": false,
-        "name": "fs_cid",
-        "path": "/",
-        "sameSite": "strict",
-        "secure": true,
-        "session": false,
-        "storeId": null,
-        "value": "1.1"
-    },
-    {
-        "domain": ".betsson.es",
-        "expirationDate": 1792078961,
-        "hostOnly": false,
-        "httpOnly": false,
-        "name": "fs_lua",
-        "path": "/",
-        "sameSite": "strict",
-        "secure": true,
-        "session": false,
-        "storeId": null,
-        "value": "1.1792077160943"
-    },
-    {
-        "domain": ".betsson.es",
-        "hostOnly": false,
-        "httpOnly": false,
-        "name": "_fs_dwell_passed",
-        "path": "/",
-        "sameSite": "strict",
-        "secure": true,
-        "session": true,
-        "storeId": null,
-        "value": "d7bbea51-56bb-44ff-a1ed-1be4b1104b5d"
-    },
-    {
-        "domain": "www.betsson.es",
-        "expirationDate": 1794669442,
-        "hostOnly": true,
-        "httpOnly": false,
-        "name": "adformfrpid",
-        "path": "/",
-        "sameSite": "lax",
-        "secure": true,
-        "session": false,
-        "storeId": null,
-        "value": "6167918491886718318"
-    },
-    {
-        "domain": ".betsson.es",
-        "expirationDate": 1823613157.13164,
+        "expirationDate": 1823614856.934359,
         "hostOnly": false,
         "httpOnly": false,
         "name": "OBG-SB-THEME",
@@ -156,7 +79,7 @@
     },
     {
         "domain": "www.betsson.es",
-        "expirationDate": 1826637440.624397,
+        "expirationDate": 1826638850.105143,
         "hostOnly": true,
         "httpOnly": true,
         "name": "OPTIMIZELY_USER_ID",
@@ -165,6 +88,6 @@
         "secure": true,
         "session": false,
         "storeId": null,
-        "value": "ad341252-b61e-430d-b944-973a14c75488"
+        "value": "ddbf347d-f432-4d09-82ab-415a613eb754"
     }
 ]

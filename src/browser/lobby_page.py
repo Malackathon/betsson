@@ -16,8 +16,9 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from playwright.sync_api import Page
+from playwright.sync_api import Locator, Page
 
+from src.browser.balance_probe import PROBE_ATTRIBUTE, find_balance_locator
 from src.browser.selectors import (
     GAME_WRAPPER_DISMISS_SELECTORS,
     OVERLAY_DISMISS_SELECTORS,
@@ -68,6 +69,7 @@ _BALANCE_STABILITY_READS = 3
 _PAGE_LOAD_TIMEOUT_MS = 30_000
 _NAV_TIMEOUT_MS = 15_000
 _OVERLAY_APPEAR_TIMEOUT_MS = 6_000
+_PROBED_RECHECK_MS = 1_500
 
 
 class LobbyPage:
@@ -88,6 +90,7 @@ class LobbyPage:
         self._sel = self._mkt.selectors
         self._parse_money = money_parser or _default_parse_money
         self._logged_in = False
+        self._balance_probed = False
 
     def login(self, username: str, password: str) -> None:
         """Log in to Betsson using a non-recording context to protect credentials (R1)."""
@@ -123,9 +126,7 @@ class LobbyPage:
             pass
 
         # Wait for login completion indicated by balance display
-        self._page.locator(self._sel.balance_display).first.wait_for(
-            state="visible", timeout=_PAGE_LOAD_TIMEOUT_MS
-        )
+        self._balance_locator(_PAGE_LOAD_TIMEOUT_MS)
         self._logged_in = True
         logger.info("[%s] Login successful", self._agent_id)
         self._save_auth_state()
@@ -144,7 +145,7 @@ class LobbyPage:
     def assert_logged_in(self, timeout_ms: int = _PAGE_LOAD_TIMEOUT_MS) -> None:
         """Fail fast, with the fix, when a reused saved session turned out expired or rejected."""
         try:
-            self._page.locator(self._sel.balance_display).first.wait_for(state="visible", timeout=timeout_ms)
+            self._balance_locator(timeout_ms)
         except Exception:
             raise RuntimeError(
                 f"[{self._agent_id}] Logged-in header (balance) not found with the saved session: it may be "
@@ -203,10 +204,16 @@ class LobbyPage:
         )
         logger.info("[%s] Game iframe detected for '%s'", self._agent_id, game_name)
 
+    def _balance_locator(self, timeout_ms: int = _NAV_TIMEOUT_MS) -> Locator:
+        """Configured balance element, or the header probe when the selector does not match."""
+        wait = _PROBED_RECHECK_MS if self._balance_probed else timeout_ms
+        locator = find_balance_locator(self._page, self._sel.balance_display, wait)
+        self._balance_probed = locator.get_attribute(PROBE_ATTRIBUTE) == "1"
+        return locator
+
     def read_balance_raw(self) -> str:
         """Read raw balance text from the Betsson header."""
-        bal_el = self._page.locator(self._sel.balance_display).first
-        bal_el.wait_for(state="visible", timeout=_NAV_TIMEOUT_MS)
+        bal_el = self._balance_locator()
         raw = bal_el.inner_text()
         logger.debug("[%s] Raw balance read: %r", self._agent_id, raw)
         return raw.strip()
