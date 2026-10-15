@@ -29,6 +29,7 @@ from src.browser.game_canvas import (
 from src.browser.lobby_page import LobbyPage
 from src.browser.selectors import get_market_selectors
 from src.browser.visual_debug import CURSOR_SCRIPT, read_visual_settings
+from src.browser.iframe_finder import page_snapshot
 from src.browser.session_watch import SessionWatch
 from src.browser.session_state import apply_session_storage, find_reusable_session
 from src.flows.spin_runner import SpinRun, run_spin_with_bonus_retry
@@ -359,8 +360,22 @@ class GameFlow:
         except Exception as exc:
             # Explain a lost session: recent navigations/HTTP errors (host/path only, no secrets).
             self._watch.checkpoint("failure", logged_out=self._lobby.is_logged_out())
-            logger.error("[%s] Game phase failed. %s", self._agent_id, self._watch.summary())
-            raise RuntimeError(f"{exc} | {self._watch.summary()}") from None
+            snapshot = page_snapshot(page)
+            shot = self._save_failure_screenshot(page)
+            detail = f"{self._watch.summary()} | On screen: {snapshot} | Screenshot: {shot}"
+            logger.error("[%s] Game phase failed. %s", self._agent_id, detail)
+            raise RuntimeError(f"{exc} | {detail}") from None
+
+    def _save_failure_screenshot(self, page: Page) -> str:
+        """Viewport screenshot of where the game phase failed (local evidence, gitignored)."""
+        try:
+            evidence = self._artifacts_dir / "evidence"
+            evidence.mkdir(parents=True, exist_ok=True)
+            path = evidence / "game_phase_failure.png"
+            page.screenshot(path=str(path))
+            return str(path)
+        except Exception:
+            return "<screenshot unavailable>"
 
     def _open_game(self, page: Page) -> None:
         assert self._lobby is not None

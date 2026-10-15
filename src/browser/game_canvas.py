@@ -19,6 +19,7 @@ from typing import TypedDict
 
 from playwright.sync_api import ElementHandle, FrameLocator, Page
 
+from src.browser.iframe_finder import find_game_iframe
 from src.browser.selectors import (
     GAME_WRAPPER_DISMISS_SELECTORS,
     MarketSelectors,
@@ -94,10 +95,9 @@ class GameCanvas:
     def locate_iframe(self) -> BoundingRect:
         """Find the game iframe and cache its bounding rectangle."""
         logger.info("[%s] Locating game iframe...", self._agent_id)
-        iframe_locator = self._page.locator(self._mkt.selectors.game_iframe)
-        iframe_locator.wait_for(state="visible", timeout=_IFRAME_WAIT_TIMEOUT_MS)
+        iframe_locator = find_game_iframe(self._page, self._mkt.selectors.game_iframe, _IFRAME_WAIT_TIMEOUT_MS)
 
-        handle = iframe_locator.first.element_handle()
+        handle = iframe_locator.element_handle()
         if handle is None:
             raise RuntimeError(f"[{self._agent_id}] Game iframe element handle is None")
         self._iframe_handle = handle

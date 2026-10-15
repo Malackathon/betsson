@@ -18,6 +18,7 @@ from typing import Protocol, runtime_checkable
 
 from playwright.sync_api import Locator, Page
 
+from src.browser.iframe_finder import find_game_iframe
 from src.browser.balance_probe import PROBE_ATTRIBUTE, find_balance_locator
 from src.browser.selectors import (
     GAME_WRAPPER_DISMISS_SELECTORS,
@@ -187,7 +188,9 @@ class LobbyPage:
         candidates = [game_name] if game_name else self._mkt.game_candidates
         last_error: Exception | None = None
 
-        for candidate in candidates:
+        for index, candidate in enumerate(candidates):
+            if index > 0:
+                self.navigate_to_casino()  # the previous attempt may have left us on a game page
             try:
                 self._try_open_game(candidate)
                 logger.info("[%s] Game '%s' opened successfully", self._agent_id, candidate)
@@ -220,9 +223,7 @@ class LobbyPage:
             play_btn.click()
 
         # Wait for game iframe to be attached
-        self._page.locator(self._sel.game_iframe).first.wait_for(
-            state="attached", timeout=_PAGE_LOAD_TIMEOUT_MS
-        )
+        find_game_iframe(self._page, self._sel.game_iframe, _PAGE_LOAD_TIMEOUT_MS)
         logger.info("[%s] Game iframe detected for '%s'", self._agent_id, game_name)
 
     def _balance_locator(self, timeout_ms: int = _NAV_TIMEOUT_MS) -> Locator:
