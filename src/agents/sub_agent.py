@@ -92,6 +92,7 @@ class SubAgentWorker:
         vision_inspector: VisionInspectorProtocol | None = None,
         motion_detector: MotionDetectorProtocol | None = None,
         max_bonus_retries: int = 3,
+        live: bool = False,
     ) -> None:
         """Initialize the subagent worker with dedicated artifact paths and dependencies."""
         raw_id = agent_id.value if hasattr(agent_id, "value") else str(agent_id)
@@ -108,6 +109,9 @@ class SubAgentWorker:
         self.password = password
         self.market_config = market_config
         self.max_bonus_retries = max_bonus_retries
+        # live=True drives the real site with the network monitor + grounded Gemini read.
+        # live=False keeps the protocol-injected path used by unit tests.
+        self.live = live
 
         # Injected or mockable adapters
         self.game_flow = game_flow
@@ -148,7 +152,9 @@ class SubAgentWorker:
         )
 
         try:
-            if self.scenario == 1:
+            if self.live:
+                self._run_live()
+            elif self.scenario == 1:
                 self._run_scenario_1()
             else:
                 self._run_scenario_2()
@@ -187,6 +193,20 @@ class SubAgentWorker:
             result_file,
         )
         return report
+
+    def _run_live(self) -> None:
+        """Run the scenario for real: network ground truth + one grounded visual verification."""
+        from src.agents.live_runner import run_live_scenario
+
+        run_live_scenario(
+            agent_id=self.agent_id.value,
+            market=self.market.value.lower(),
+            scenario=self.scenario,
+            username=self.username,
+            password=self.password,
+            artifacts_dir=self.artifacts_dir,
+            runner=self.runner,
+        )
 
     def _run_scenario_1(self) -> None:
         """Execute Scenario 1: Real Play spin and mathematical reconciliation."""

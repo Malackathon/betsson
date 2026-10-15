@@ -17,6 +17,8 @@ from typing import Any
 from pydantic import BaseModel, Field
 from PIL import Image
 
+from src.vision.grounding import GroundedScreenReading
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -282,6 +284,33 @@ class GeminiInspector:
         )
         data = self._call_gemini(prompt, img, GeminiMessageReading)
         return GeminiMessageReading.model_validate(data) if data else GeminiMessageReading()
+
+    def read_screen_grounded(
+        self,
+        screenshot: Image.Image | Path | bytes,
+        reference_block: str,
+    ) -> GroundedScreenReading:
+        """Transcribe HUD values and any dialog in ONE call, grounded with server facts.
+
+        ``reference_block`` comes from ``src.vision.grounding.build_reference_block``.
+        The model only transcribes; the caller compares in code (``compare_reading``).
+        """
+        img = self._prepare_image(screenshot)
+        prompt = (
+            "Look at this Pragmatic Play slot screenshot and transcribe, exactly as displayed "
+            "(character by character, including currency symbols and separators):\n"
+            "- credit_raw: the CREDIT / BALANCE value\n"
+            "- bet_raw: the total BET value\n"
+            "- win_raw: the WIN value (null if the screen shows no win value)\n"
+            "- currency_raw: the currency symbol or code you can see\n"
+            "- message_raw: the full text of any dialog, popup or error message (null if none)\n"
+            "- message_language: 'EN' or 'ES' for that message (null if none)\n"
+            "- legible: false if you cannot read the numbers with confidence\n"
+            "Do not parse, round or convert numbers.\n\n"
+            f"{reference_block}"
+        )
+        data = self._call_gemini(prompt, img, GroundedScreenReading)
+        return GroundedScreenReading.model_validate(data) if data else GroundedScreenReading(legible=False)
 
     def locate_spin_button(
         self,

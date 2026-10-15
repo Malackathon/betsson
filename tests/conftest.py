@@ -102,6 +102,7 @@ def sub_agent_worker(
         artifacts_dir=agent_artifacts_dir,
         username=agent_credentials.username,
         password=agent_credentials.password,
+        live=True,
     )
     return worker
 

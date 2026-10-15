@@ -138,6 +138,7 @@ class MasterOrchestrator:
             artifacts_dir=worker_artifacts_dir,
             username=username,
             password=password,
+            live=bool(username and password),
         )
 
         # Protect execution with account lock in case multiple workers share username

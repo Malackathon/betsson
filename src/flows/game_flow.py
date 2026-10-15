@@ -28,6 +28,9 @@ from src.browser.game_canvas import (
 )
 from src.browser.lobby_page import LobbyPage
 from src.browser.selectors import get_market_selectors
+from src.flows.spin_runner import SpinRun, run_spin_with_bonus_retry
+from src.network.models import RoundResult, SpinAttempt, SpinAttemptStatus
+from src.network.monitor import NetworkMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +66,13 @@ class SpinOutcome:
     insufficient_location: InsufficientFundsLocation = InsufficientFundsLocation.NOT_DETECTED
     screenshots: list[Path] = field(default_factory=list)
     video_path: Path | None = None
+    # Network ground truth (zero-cost, deterministic). ``hud_credit_*`` are the in-game
+    # balances as reported by the game server, not read from pixels.
+    spin_attempt: SpinAttempt | None = None
+    network_round: RoundResult | None = None
+    final_screenshot: Path | None = None
+    bonus_retries: int = 0
+    network_evidence: Path | None = None
 
 
 @dataclass
@@ -76,8 +86,9 @@ class FlowCallbacks:
     on_insufficient_funds: Callable[[str, InsufficientFundsLocation], None] | None = None
 
 
-_POST_SPIN_SETTLE_MS = 3000
 _RETRY_SPIN_ON_BONUS_MAX = 3
+_S2_ROUND_TIMEOUT_S = 6.0  # a rejected spin never settles; do not wait the full round timeout
+_NETWORK_EVIDENCE_REL = Path("network") / "game_transactions.json"
 _VIDEO_DIR_NAME = "video"
 _AUTH_STATE_DIR_NAME = "auth_state"
 
@@ -95,7 +106,9 @@ class GameFlow:
         artifacts_dir: Path | None = None,
         headless: bool = True,
         callbacks: FlowCallbacks | None = None,
+        monitor: NetworkMonitor | None = None,
     ) -> None:
+        self._monitor = monitor or NetworkMonitor()
         self._pw = playwright
         self._market = market
         self._agent_id = agent_id
@@ -114,6 +127,11 @@ class GameFlow:
         self._game_name: str = ""
         self._auth_state_path: Path | None = None
 
+    @property
+    def monitor(self) -> NetworkMonitor:
+        """Network monitor attached to the recorded game page."""
+        return self._monitor
+
     def prepare(self) -> tuple[LobbyPage, GameCanvas]:
         """Phase 1: Login without recording + open game with video recording."""
         self._launch_browser()
@@ -127,9 +145,13 @@ class GameFlow:
         self,
         spin_coords_provider: Callable[[Path], RelativeCoords] | None = None,
     ) -> SpinOutcome:
-        """Execute Scenario 1: Real Play spin + balance reconciliation."""
+        """Execute Scenario 1: Real Play spin + balance reconciliation.
+
+        The spin is judged by the game server's own response (network monitor); the final
+        screenshot is taken the moment the round settles, for the single visual verification.
+        """
         assert self._lobby is not None and self._canvas is not None
-        outcome = SpinOutcome(status=SpinStatus.COMPLETED)
+        outcome = SpinOutcome(status=SpinStatus.ERROR)
 
         outcome.balance_before = self._lobby.read_balance_stable()
         if self._callbacks.on_balance_read:
@@ -139,21 +161,17 @@ class GameFlow:
         outcome.screenshots.append(pre_screenshot)
         spin_coords = self._get_spin_coords(pre_screenshot, spin_coords_provider)
 
-        retries = 0
-        while retries < _RETRY_SPIN_ON_BONUS_MAX:
-            if self._callbacks.on_spin_start:
-                self._callbacks.on_spin_start()
-
-            self._canvas.click_spin(spin_coords)
-            self._canvas.page.wait_for_timeout(_POST_SPIN_SETTLE_MS)
-
-            post_screenshot = self._canvas.take_game_screenshot("s1_post_spin")
-            outcome.screenshots.append(post_screenshot)
-            outcome.status = SpinStatus.COMPLETED
-            break
+        if self._callbacks.on_spin_start:
+            self._callbacks.on_spin_start()
+        run = run_spin_with_bonus_retry(
+            self._canvas, self._monitor, spin_coords, max_bonus_retries=_RETRY_SPIN_ON_BONUS_MAX
+        )
+        self._apply_spin_run(outcome, run)
+        outcome.status = self._status_for_scenario_1(run)
 
         outcome.balance_after = self._lobby.read_balance_stable()
         outcome.currency_observed = self._lobby.read_currency_from_header()
+        outcome.network_evidence = self._save_network_evidence()
         if self._callbacks.on_spin_end:
             self._callbacks.on_spin_end(outcome)
         outcome.video_path = self._get_video_path()
@@ -167,6 +185,8 @@ class GameFlow:
         assert self._lobby is not None and self._canvas is not None
         outcome = SpinOutcome(status=SpinStatus.INSUFFICIENT_FUNDS)
 
+        self._monitor.mark()  # drain pending responses so last_balance is current
+        net_before = self._monitor.last_balance  # in-game balance per the server, BEFORE the attempt
         outcome.balance_before = self._lobby.read_balance_stable()
         if self._callbacks.on_balance_read:
             self._callbacks.on_balance_read(outcome.balance_before)
@@ -181,13 +201,18 @@ class GameFlow:
             if self._callbacks.on_insufficient_funds:
                 self._callbacks.on_insufficient_funds(msg, location)
         else:
-            # Trigger by clicking spin
+            # Trigger by clicking spin; the monitor tells us whether the server accepted it.
             spin_coords = self._get_spin_coords(pre_screenshot, spin_coords_provider)
-            self._canvas.click_spin(spin_coords)
-            self._canvas.page.wait_for_timeout(2000)
-
-            post_screenshot = self._canvas.take_game_screenshot("s2_post_click")
-            outcome.screenshots.append(post_screenshot)
+            run = run_spin_with_bonus_retry(
+                self._canvas,
+                self._monitor,
+                spin_coords,
+                round_timeout_s=_S2_ROUND_TIMEOUT_S,
+                max_bonus_retries=1,
+            )
+            self._apply_spin_run(outcome, run)
+            if run.attempt.status is SpinAttemptStatus.SETTLED:
+                outcome.status = SpinStatus.COMPLETED  # a PAID spin went through: unexpected here
 
             # Location 2 & 3: wrapper or after click
             msg, location = self._check_insufficient_funds_wrapper()
@@ -202,11 +227,51 @@ class GameFlow:
         outcome.currency_observed = self._lobby.read_currency_from_header()
         final_screenshot = self._canvas.take_game_screenshot("s2_final")
         outcome.screenshots.append(final_screenshot)
+        outcome.final_screenshot = outcome.final_screenshot or final_screenshot
+        self._monitor.mark()  # drain pending responses so last_balance is current
+        net_after = self._monitor.last_balance
+        if net_before is not None and net_after is not None:
+            outcome.hud_credit_before, outcome.hud_credit_after = net_before, net_after
+        outcome.bet_amount = outcome.bet_amount or self._monitor.last_bet or Decimal("0")
+        outcome.network_evidence = self._save_network_evidence()
 
         if self._callbacks.on_spin_end:
             self._callbacks.on_spin_end(outcome)
         outcome.video_path = self._get_video_path()
         return outcome
+
+    def _apply_spin_run(self, outcome: SpinOutcome, run: SpinRun) -> None:
+        """Copy the server-side truth of a spin run into the outcome."""
+        outcome.spin_attempt = run.attempt
+        outcome.bonus_retries = run.bonus_retries
+        if run.final_screenshot is not None:
+            outcome.final_screenshot = run.final_screenshot
+            outcome.screenshots.append(run.final_screenshot)
+        rnd = run.attempt.round
+        outcome.network_round = rnd
+        if rnd is None:
+            return
+        outcome.bet_amount = rnd.bet or Decimal("0")
+        outcome.win_amount = rnd.total_win or Decimal("0")
+        outcome.hud_credit_before = rnd.balance_before or Decimal("0")
+        outcome.hud_credit_after = rnd.balance_after or Decimal("0")
+
+    @staticmethod
+    def _status_for_scenario_1(run: SpinRun) -> SpinStatus:
+        attempt = run.attempt
+        if attempt.status is SpinAttemptStatus.REJECTED:
+            return SpinStatus.INSUFFICIENT_FUNDS
+        if attempt.status is not SpinAttemptStatus.SETTLED or attempt.round is None:
+            return SpinStatus.ERROR
+        return SpinStatus.BONUS_TRIGGERED if attempt.round.bonus_triggered else SpinStatus.COMPLETED
+
+    def _save_network_evidence(self) -> Path | None:
+        """Persist the sanitized game transactions next to the other evidence."""
+        try:
+            return self._monitor.save_evidence(self._artifacts_dir / _NETWORK_EVIDENCE_REL)
+        except Exception as exc:
+            logger.warning("[%s] Could not save network evidence: %s", self._agent_id, exc)
+            return None
 
     def _launch_browser(self) -> None:
         """Launch browser engine (Firefox for antibot evasion, or Chromium)."""
@@ -261,6 +326,8 @@ class GameFlow:
             record_video_size=DEFAULT_VIEWPORT,
         )
         page = self._ctx_game.new_page()
+        # Attach BEFORE navigating so the game's init response (starting balance) is captured.
+        self._monitor.attach(page)
         auth_dir = self._artifacts_dir.parent / _AUTH_STATE_DIR_NAME
         self._lobby = LobbyPage(page=page, market=self._market, agent_id=self._agent_id, auth_state_dir=auth_dir)
 
@@ -357,6 +424,7 @@ class GameFlow:
 
     def close(self) -> None:
         """Close browser contexts and browser."""
+        self._monitor.detach()
         for ctx in (self._ctx_game, self._ctx_login):
             if ctx is not None:
                 try:
