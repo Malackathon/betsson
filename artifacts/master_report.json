@@ -1,0 +1,90 @@
+{
+  "reports": [
+    {
+      "agent_id": "agent_com_s1",
+      "market": "COM",
+      "scenario": 1,
+      "checks": [
+        {
+          "id": "CRITICAL_ERROR",
+          "name": "Ejecución de SubAgente sin excepciones críticas",
+          "expected": "Ejecución limpia",
+          "observed": "RuntimeError: [agent_com_s1] Logged-in header (balance) not found with the saved session: it may be expired/rejected, or the 'balance_display' selector in config/markets.json does not match this site. Re-save the session with: python scripts/save_session.py agent_com_s1. Detail: Page.evaluate: Target page, context or browser has been closed. Header screenshot: <screenshot unavailable> | Recent events (oldest first):\nNAVIGATED www.betsson.es/\nNAVIGATED www.betsson.es/\nGET 401 www.betsson.es/api/v1/current-single-sign-on-session\nGET 401 www.betsson.es/api/v1/gaming/dgoj/Session/GetSummary\nGET 401 www.betsson.es/api/v1/gaming/dgoj/Session/Check\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nGET 401 www.betsson.es/api/v1/gaming/dgoj/Session/GetSummary\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nNAVIGATED www.betsson.es/\nNAVIGATED www.betsson.es/inicio\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/v2/authentication-transaction\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nNAVIGATED www.betsson.es/\nCHECKPOINT failure: logged in | On screen: {'error': 'Page.evaluate: Target page, context or browser has been closed', 'iframes': [], 'dialogs': [], 'buttons': []} | Screenshot: <screenshot unavailable>",
+          "detail": "RuntimeError: [agent_com_s1] Logged-in header (balance) not found with the saved session: it may be expired/rejected, or the 'balance_display' selector in config/markets.json does not match this site. Re-save the session with: python scripts/save_session.py agent_com_s1. Detail: Page.evaluate: Target page, context or browser has been closed. Header screenshot: <screenshot unavailable> | Recent events (oldest first):\nNAVIGATED www.betsson.es/\nNAVIGATED www.betsson.es/\nGET 401 www.betsson.es/api/v1/current-single-sign-on-session\nGET 401 www.betsson.es/api/v1/gaming/dgoj/Session/GetSummary\nGET 401 www.betsson.es/api/v1/gaming/dgoj/Session/Check\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nGET 401 www.betsson.es/api/v1/gaming/dgoj/Session/GetSummary\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nNAVIGATED www.betsson.es/\nNAVIGATED www.betsson.es/inicio\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/v2/authentication-transaction\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nPOST 403 www.betsson.es/api/fraud/v1/groupib/tokens/generate\nNAVIGATED www.betsson.es/\nCHECKPOINT failure: logged in | On screen: {'error': 'Page.evaluate: Target page, context or browser has been closed', 'iframes': [], 'dialogs': [], 'buttons': []} | Screenshot: <screenshot unavailable>",
+          "status": "ERROR"
+        }
+      ],
+      "evidence_dir": "/home/mmarmadrid/projects/betsson/artifacts/agent_com_s1/evidence",
+      "video_path": "/home/mmarmadrid/projects/betsson/artifacts/agent_com_s1/video/page@7c5f9374b43cd0ede35e4ef303928d26.webm",
+      "started_at": "2026-10-15T17:52:11.766994Z",
+      "finished_at": "2026-10-15T17:52:42.835785Z"
+    },
+    {
+      "agent_id": "agent_com_s2",
+      "market": "COM",
+      "scenario": 2,
+      "checks": [
+        {
+          "id": "S2.01",
+          "name": "Precondición: saldo < apuesta",
+          "expected": "saldo < apuesta",
+          "observed": "saldo=0.05, apuesta=0.20",
+          "detail": "Cuenta preparada para validar saldo insuficiente",
+          "status": "PASS"
+        },
+        {
+          "id": "S2.02",
+          "name": "El giro es rechazado (no hay giro pagado)",
+          "expected": "True",
+          "observed": "True",
+          "detail": "Saldo no descontado y aviso presente. Movimiento en pantalla=True (dato informativo de modal)",
+          "status": "PASS"
+        },
+        {
+          "id": "S2.03",
+          "name": "Mensaje de saldo insuficiente visible",
+          "expected": "Texto de mensaje no vacío",
+          "observed": "Insufficient funds to place bet. Please deposit.",
+          "detail": "Mensaje extraído: 'Insufficient funds to place bet. Please deposit.'",
+          "status": "PASS"
+        },
+        {
+          "id": "S2.04",
+          "name": "Mensaje en el idioma del mercado",
+          "expected": "any of: ['insufficient', 'funds', 'balance']",
+          "observed": "matched: ['insufficient', 'funds']",
+          "detail": "Found keyword(s) ['insufficient', 'funds'] in message: 'Insufficient funds to place bet. Please deposit.'",
+          "status": "PASS"
+        },
+        {
+          "id": "S2.05",
+          "name": "Moneda mostrada = mercado",
+          "expected": "€",
+          "observed": "€",
+          "detail": "Moneda en interfaz de alerta: €",
+          "status": "PASS"
+        },
+        {
+          "id": "S2.06",
+          "name": "Saldo in-game sin cambios",
+          "expected": "0.05",
+          "observed": "0.05",
+          "detail": "Balance unchanged: 0.05",
+          "status": "PASS"
+        },
+        {
+          "id": "S2.07",
+          "name": "Saldo Betsson sin cambios",
+          "expected": "0.05",
+          "observed": "0.05",
+          "detail": "Balance unchanged: 0.05",
+          "status": "PASS"
+        }
+      ],
+      "evidence_dir": "/home/mmarmadrid/projects/betsson/artifacts/agent_com_s2/evidence",
+      "video_path": null,
+      "started_at": "2026-10-15T14:06:03.338915Z",
+      "finished_at": "2026-10-15T14:06:03.339244Z"
+    }
+  ]
+}

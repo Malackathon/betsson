@@ -1,0 +1,67 @@
+{
+  "agent_id": "agent_com_s2",
+  "market": "COM",
+  "scenario": 2,
+  "checks": [
+    {
+      "id": "S2.01",
+      "name": "Precondición: saldo < apuesta",
+      "expected": "saldo < apuesta",
+      "observed": "saldo=0.05, apuesta=0.20",
+      "detail": "Cuenta preparada para validar saldo insuficiente",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.02",
+      "name": "El giro es rechazado (no hay giro pagado)",
+      "expected": "True",
+      "observed": "True",
+      "detail": "Saldo no descontado y aviso presente. Movimiento en pantalla=True (dato informativo de modal)",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.03",
+      "name": "Mensaje de saldo insuficiente visible",
+      "expected": "Texto de mensaje no vacío",
+      "observed": "Insufficient funds to place bet. Please deposit.",
+      "detail": "Mensaje extraído: 'Insufficient funds to place bet. Please deposit.'",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.04",
+      "name": "Mensaje en el idioma del mercado",
+      "expected": "any of: ['insufficient', 'funds', 'balance']",
+      "observed": "matched: ['insufficient', 'funds']",
+      "detail": "Found keyword(s) ['insufficient', 'funds'] in message: 'Insufficient funds to place bet. Please deposit.'",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.05",
+      "name": "Moneda mostrada = mercado",
+      "expected": "€",
+      "observed": "€",
+      "detail": "Moneda en interfaz de alerta: €",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.06",
+      "name": "Saldo in-game sin cambios",
+      "expected": "0.05",
+      "observed": "0.05",
+      "detail": "Balance unchanged: 0.05",
+      "status": "PASS"
+    },
+    {
+      "id": "S2.07",
+      "name": "Saldo Betsson sin cambios",
+      "expected": "0.05",
+      "observed": "0.05",
+      "detail": "Balance unchanged: 0.05",
+      "status": "PASS"
+    }
+  ],
+  "evidence_dir": "/home/mmarmadrid/projects/betsson/artifacts/agent_com_s2/evidence",
+  "video_path": null,
+  "started_at": "2026-10-15T14:06:03.338915Z",
+  "finished_at": "2026-10-15T14:06:03.339244Z"
+}
