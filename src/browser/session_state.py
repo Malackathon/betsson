@@ -6,6 +6,7 @@ The session file holds cookies and storage of a logged-in account: it lives unde
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from pathlib import Path
@@ -32,3 +33,23 @@ def find_reusable_session(
         return None
     limit = max_age_s if max_age_s is not None else float(os.getenv("SAVED_SESSION_MAX_AGE_S", DEFAULT_MAX_AGE_S))
     return path if time.time() - path.stat().st_mtime <= limit else None
+
+
+def session_storage_sidecar(auth_state_path: Path) -> Path:
+    """File next to the auth state holding the sessionStorage items to restore."""
+    return auth_state_path.with_suffix(".session.json")
+
+
+def apply_session_storage(context, auth_state_path: Path) -> bool:
+    """Restore the saved sessionStorage into a Playwright context. True when something was applied."""
+    from src.browser.cookie_import import WebStorage, build_session_storage_script
+
+    sidecar = session_storage_sidecar(auth_state_path)
+    if not sidecar.is_file():
+        return False
+    data = json.loads(sidecar.read_text(encoding="utf-8"))
+    web = WebStorage(origin=data["origin"], local={}, session=data.get("session", {}))
+    if not web.session:
+        return False
+    context.add_init_script(build_session_storage_script(web))
+    return True

@@ -12,3 +12,5 @@ auth_state/*
 *.webm
 trace*.zip
 report.html
+
+storage.json

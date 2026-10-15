@@ -22,7 +22,7 @@ from config.settings import get_settings  # noqa: E402
 from src.browser.game_canvas import DEFAULT_VIEWPORT  # noqa: E402
 from src.browser.lobby_page import LobbyPage  # noqa: E402
 from src.browser.selectors import get_market_selectors  # noqa: E402
-from src.browser.session_state import saved_session_path  # noqa: E402
+from src.browser.session_state import apply_session_storage, saved_session_path  # noqa: E402
 
 SETTLE_MS = 10_000
 BALANCE_LIKE = (
@@ -48,6 +48,7 @@ def main(agent_id: str) -> None:
     with sync_playwright() as pw:
         browser = getattr(pw, browser_name).launch(headless=get_settings().headless)
         context = browser.new_context(viewport=DEFAULT_VIEWPORT, locale=mkt.locale, storage_state=str(session))
+        apply_session_storage(context, session)
         page = context.new_page()
         failures: Counter[str] = Counter()
         page.on(

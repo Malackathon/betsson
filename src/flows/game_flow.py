@@ -28,7 +28,7 @@ from src.browser.game_canvas import (
 )
 from src.browser.lobby_page import LobbyPage
 from src.browser.selectors import get_market_selectors
-from src.browser.session_state import find_reusable_session
+from src.browser.session_state import apply_session_storage, find_reusable_session
 from src.flows.spin_runner import SpinRun, run_spin_with_bonus_retry
 from src.network.models import RoundResult, SpinAttempt, SpinAttemptStatus
 from src.network.monitor import NetworkMonitor
@@ -336,6 +336,8 @@ class GameFlow:
             record_video_dir=str(video_dir),
             record_video_size=DEFAULT_VIEWPORT,
         )
+        if self._reused_session:
+            apply_session_storage(self._ctx_game, self._auth_state_path)
         page = self._ctx_game.new_page()
         # Attach BEFORE navigating so the game's init response (starting balance) is captured.
         self._monitor.attach(page)
