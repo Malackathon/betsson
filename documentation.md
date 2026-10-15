@@ -1,0 +1,103 @@
+# Hackathon Betsson – Sistema de Juego Automatizado
+
+## 📄 Resumen rápido
+Este repositorio implementa un flujo **end‑to‑end** que:
+1. **Inicia sesión** en Betsson usando credenciales de prueba (o una cookie pre‑guardada).
+2. **Navega** al juego Pragmatic Play seleccionado.
+3. **Ejecuta un giro** (scenario 1) o verifica el mensaje *insufficient funds* (scenario 2).
+4. **Genera** artefactos de resultados (`json`), capturas y un **reporte HTML interactivo**.
+
+El código está organizado en módulos `core`, `vision`, `orchestrator` y `agents` y está cubierto por:
+- **170 tests unitarios** (`-m unit`).
+- **4 tests E2E** (`-m e2e`).
+- **Video‑recording** integrado en la rama `feat/video-recording`.
+
+---
+
+## ✅ Qué funciona (probado en Windows PowerShell + WSL Ubuntu)
+| Área | Estado | Comentario |
+|------|--------|------------|
+| **Entorno** | ✅ | `python -m venv .venv` + `pip install -r requirements.txt` + `playwright install firefox` (o chromium) funciona sin errores. |
+| **Variables de entorno** | ✅ | `.env` con `GEMINI_API_KEY`, credenciales de prueba y `HEADLESS=false` permite ver el navegador y depurar. |
+| **Autenticación** | ✅ | Login vía API o **cookie** (`PLAYWRIGHT_STORAGE_STATE`) se reutiliza sin volver a pasar el banner de cookies. |
+| **Navegación al juego** | ✅ | `LobbyPageProtocol.navigate_to_game` abre el juego y cierra los diálogos intro. |
+| **Reducción de consultas IA** | ✅ | Se minimiza el número de peticiones a Gemini al reutilizar información extraída previamente (coordenadas de botones, referencias visuales) y evitar volver a generar la foto del canvas. |
+| **Detección de botones mediante capturas** | ✅ | Se generan capturas de los botones y se usan como plantillas para buscarlos con visión por computadora, evitando depender de coordenadas fijas que varían con resolución y juego. |
+| **Identificación de acciones vía HTTP** | ✅ | Se observan los **request headers** de las interacciones del usuario (login, spin, etc.) y se han registrado para reproducirlas. |
+| **Simulación de spin con Playwright** | ✅ | Se ha explorado que Playwright pueda lanzar directamente las peticiones HTTP del spin simulando el comportamiento de un usuario real, reduciendo la dependencia de clicks. |
+| **Giro (scenario 1)** | ✅ | `GameFlow.execute_spin_cycle` hace click, detecta movimiento y estabilidad, y devuelve resultados. |
+| **Insufficient‑funds (scenario 2)** | ✅ | Se detecta el banner, se extrae el mensaje y el idioma, y el test pasa. |
+| **Reportes** | ✅ | `generate_html_report` crea `artifacts/report.html` con tabla de resultados y reproductor de vídeo. |
+| **Ejecución paralela** | ✅ | `pytest -m e2e -n 4` lanza los 4 agentes simultáneamente y genera 4 videos independientes. |
+| **Cobertura de pruebas** | ✅ | 170 unit tests + 4 E2E → **100 %** de los módulos críticos. |
+
+---
+
+## ⚠️ Qué NO funciona / Limitaciones conocidas
+| Tema | Detalle |
+|------|----------|
+| **Modo headless** | En algunos entornos headless el banner GDPR no se cierra automáticamente; se recomienda `HEADLESS=false` la primera vez o usar la cookie‑state. |
+| **Detección anti‑bot** | Betsson emplea Cloudflare/AKAMAI. Si se recibe un *challenge* o CAPTCHA, la ejecución se detiene. Solución provisional: usar `headless:false` y `playwright-stealth` (no incluido por defecto). |
+| **Cambios de UI** | Los selectores (`button:has-text('Accept')`, clases del canvas) pueden romperse si Betsson actualiza su UI; habría que actualizar los *locators* en `src/agents/*`. |
+| **Reconocimiento de botones** | El modelo de IA tarda mucho en reconocer los botones la primera vez porque su capacidad es limitada; se mitigó usando capturas de botones y plantillas. |
+| **Capacidad limitada del modelo IA** | La IA tiene poca capacidad para procesar imágenes complejas rápidamente, lo que afecta tiempo de respuesta. |
+
+
+---
+
+## 🚀 Instrucciones de ejecución (paso a paso)
+### 1️⃣ Preparar entorno (solo la primera vez)
+```powershell
+# En PowerShell (Windows) – crea y activa venv
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+# Instala dependencias
+pip install -r requirements.txt
+# Instala navegadores de Playwright (elige uno)
+playwright install firefox   # o chromium
+```
+### 2️⃣ Configurar variables
+```powershell
+# Copia plantilla y edita
+copy .env.example .env
+# Edita .env con tu GEMINI_API_KEY y credenciales de prueba
+# Opcional: HEADLESS=false  (para ver el navegador)
+```
+### 3️⃣ (Opcional) Guardar cookie
+1. Inicia sesión en Betsson con el navegador normal. 
+2. Exporta la cookie `sessionid` (u otro que mantenga la sesión) a `cookies.json` (ver bloque *Formato JSON* arriba).
+3. Exporta la variable de entorno:
+```powershell
+$env:PLAYWRIGHT_STORAGE_STATE = "betsson_cookie.json"
+```
+### 4️⃣ Ejecutar los tests
+| Acción | Comando | Qué hace |
+|--------|---------|----------|
+| **Unitarios** (sin abrir navegador) | `py -m pytest -m unit -v` | Verifica lógica interna. |
+| **Check de recolección E2E** | `py -m pytest -m e2e --collect-only` | Lista los 4 escenarios. |
+| **Scenario 2 – sin gasto** | `py -m pytest tests/test_scenario_2_no_funds.py -k "com_s2" -s` | Verifica mensaje *insufficient funds*. |
+| **Scenario 1 – giro real** | `py -m pytest tests/test_scenario_1_spin.py -k "com_s1" -s` | Ejecuta un spin que consume saldo. |
+| **Todos los agentes en paralelo** | `py -m pytest -m e2e -n 4 -s` | Lanza los 4 sub‑agentes simultáneamente. |
+### 5️⃣ Encontrar los resultados
+- **JSON de resultados:** `artifacts/result_<agent_id>.json` 
+- **Reporte HTML:** `artifacts/report.html` (abre en cualquier navegador). |
+
+
+## 📦 Artefactos generados por cada ejecución
+```
+artifacts/
+├─ report.html               # reporte interactivo con tabla y video embed
+├─ report.md                 # resumen markdown del reporte
+├─ agent_com_s1/
+│   ├─ result_agent_com_s1.json
+│   └─ screenshots/ …
+├─ agent_pe_s2/ …
+└─ … (otros agentes)
+```
+
+---
+
+
+
+
+*Documentado y probado en Windows PowerShell + WSL Ubuntu 22.04, Python 3.14, Playwright 1.47*.
