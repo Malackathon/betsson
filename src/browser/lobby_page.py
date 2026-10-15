@@ -97,7 +97,10 @@ class LobbyPage:
         # Open login form
         login_btn = self._page.locator(self._sel.login_button).first
         login_btn.wait_for(state="visible", timeout=_NAV_TIMEOUT_MS)
-        login_btn.click()
+        try:
+            login_btn.click(timeout=5000)
+        except Exception:
+            login_btn.click(force=True)
         logger.info("[%s] Login form opened", self._agent_id)
 
         # Fill credentials
@@ -109,9 +112,14 @@ class LobbyPage:
         pwd_input.wait_for(state="visible", timeout=_NAV_TIMEOUT_MS)
         pwd_input.fill(password)
 
-        # Submit login
-        submit_btn = self._page.locator(self._sel.submit_login).first
-        submit_btn.click()
+        # Submit login via Enter key press (universal standard) + fallback click
+        pwd_input.press("Enter")
+        try:
+            submit_btn = self._page.locator(self._sel.submit_login).last
+            if submit_btn.count() > 0:
+                submit_btn.click(force=True, timeout=3000)
+        except Exception:
+            pass
 
         # Wait for login completion indicated by balance display
         self._page.locator(self._sel.balance_display).first.wait_for(

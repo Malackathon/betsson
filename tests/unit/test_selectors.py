@@ -86,6 +86,20 @@ class TestGetMarketSelectors:
         assert mkt1 == mkt2
         assert mkt1 is not mkt2
 
+    def test_stage_url_override_arg(self) -> None:
+        """Explicit base_url_override switches target stage URL seamlessly."""
+        mkt = get_market_selectors("com", base_url_override="https://test.betsson.internal")
+        assert mkt.url == "https://test.betsson.internal"
+        assert mkt.casino_url == "https://test.betsson.internal/en/casino"
+
+    def test_stage_url_override_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Environment variable BETSSON_BASE_URL switches target stage URL seamlessly."""
+        monkeypatch.setenv("BETSSON_BASE_URL", "https://uat.betsson.dev")
+        monkeypatch.setenv("BETSSON_CASINO_URL", "https://uat.betsson.dev/custom/casino")
+        mkt = get_market_selectors("com")
+        assert mkt.url == "https://uat.betsson.dev"
+        assert mkt.casino_url == "https://uat.betsson.dev/custom/casino"
+
 
 class TestMarketSelectorsFields:
     """Tests for ``MarketSelectors`` field integrity."""

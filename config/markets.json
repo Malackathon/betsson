@@ -25,18 +25,18 @@
       "thousands_sep": ","
     },
     "selectors": {
-      "login_button": "fdsp-button:has-text('Log in'), button:has-text('Log in'), .button-control_wrapper:has-text('Log in'), button[data-testid='header-login-button'], a:has-text('Log in')",
+      "login_button": "fdsp-button:has-text('Log in'), fdsp-button:has-text('Iniciar sesión'), button:has-text('Log in'), button:has-text('Iniciar sesión'), .button-control_wrapper:has-text('Log in'), .button-control_wrapper:has-text('Iniciar sesión'), button[data-testid='header-login-button'], a:has-text('Log in'), a:has-text('Iniciar sesión')",
       "username_input": "input#email-input, input[name='email'], input[data-testid='login-username'], input[name='username'], input#username",
       "password_input": "input#password-input, input[name='password'], input[data-testid='login-password'], input#password",
-      "submit_login": "fdsp-button:has-text('Log in'), button[data-testid='login-submit'], button[type='submit']:has-text('Log in'), button:has-text('Log in')",
+      "submit_login": "form button[type='submit'], form fdsp-button:has-text('Log in'), form fdsp-button:has-text('Iniciar sesión'), button[data-testid='login-submit'], button[type='submit']:has-text('Log in'), button[type='submit']:has-text('Iniciar sesión'), form button:has-text('Log in'), form button:has-text('Iniciar sesión')",
       "balance_display": "[data-testid='balance-amount'], .balance-amount, .header-balance, .user-balance, .balance-display",
       "currency_display": "[data-testid='balance-currency'], .balance-currency, .currency-symbol",
-      "search_input": "input[data-testid='search-game'], input[placeholder*='Search'], input[aria-label='Search'], input.search-input",
+      "search_input": "input[data-testid='search-game'], input[placeholder*='Search'], input[placeholder*='Buscar'], input[aria-label='Search'], input[aria-label='Buscar'], input.search-input",
       "game_card": "a.preview-item:has-text('{game_name}'), [data-testid='game-card-{game_name}'], .game-card:has-text('{game_name}'), a[title='{game_name}']",
-      "play_real_button": "button[data-testid='play-real'], button:has-text('Play'), button:has-text('Real Play'), a:has-text('Play')",
+      "play_real_button": "button[data-testid='play-real'], button:has-text('Play'), button:has-text('Jugar'), button:has-text('Real Play'), button:has-text('Jugar en Real'), a:has-text('Play'), a:has-text('Jugar')",
       "game_iframe": "iframe[data-testid='game-iframe'], iframe.game-iframe, iframe[src*='pragmaticplay']",
-      "close_modal": "button[data-testid='close-modal'], button[aria-label='Close'], .modal-close, .close-button",
-      "cookie_accept": "#onetrust-accept-btn-handler, button[data-testid='cookie-accept'], button:has-text('Accept')"
+      "close_modal": "button[data-testid='close-modal'], button[aria-label='Close'], button[aria-label='Cerrar'], .modal-close, .close-button",
+      "cookie_accept": "#onetrust-accept-btn-handler, button[data-testid='cookie-accept'], button:has-text('Accept'), button:has-text('Aceptar')"
     },
     "notes": [
       "Spike finding: Betsson redirects to regional domain (e.g. betsson.es) when accessed from specific IPs (Spain); runner proxy or local execution needed if geoblocked (R3).",

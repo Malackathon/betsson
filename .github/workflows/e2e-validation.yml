@@ -8,6 +8,24 @@ name: E2E Validation (Betsson Challenge)
 on:
   workflow_dispatch:
     inputs:
+      stage:
+        description: 'Entorno de ejecución (production o testing)'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - 'production'
+          - 'testing'
+      custom_url:
+        description: 'URL base personalizada para testing/UAT (opcional, ej. https://testing.betsson.com)'
+        required: false
+        default: ''
+        type: string
+      custom_casino_url:
+        description: 'URL del lobby de casino personalizada (opcional, ej. https://testing.betsson.com/en/casino)'
+        required: false
+        default: ''
+        type: string
       market:
         description: 'Mercado a validar (all, com, pe)'
         required: true
@@ -101,6 +119,9 @@ jobs:
           BETSSON_PE_S2_USER: ${{ secrets.BETSSON_PE_S2_USER }}
           BETSSON_PE_S2_PASS: ${{ secrets.BETSSON_PE_S2_PASS }}
           HEADLESS: ${{ inputs.headless }}
+          STAGE: ${{ inputs.stage }}
+          BETSSON_BASE_URL: ${{ inputs.custom_url }}
+          BETSSON_CASINO_URL: ${{ inputs.custom_casino_url }}
           INPUT_MARKET: ${{ inputs.market }}
           INPUT_SCENARIO: ${{ inputs.scenario }}
         run: |

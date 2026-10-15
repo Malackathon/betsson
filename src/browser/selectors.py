@@ -12,6 +12,7 @@ Selector strategy (in order of preference):
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -135,23 +136,19 @@ def _load_markets() -> dict[str, Any]:
 _cache: dict[str, MarketSelectors] | None = None
 
 
-def get_market_selectors(market: str = "com") -> MarketSelectors:
+def get_market_selectors(
+    market: str = "com",
+    base_url_override: str | None = None,
+    casino_url_override: str | None = None,
+) -> MarketSelectors:
     """Get selectors and config for a market (defaults to 'com').
 
-    Loads from ``config/markets.json`` on first call; cached thereafter.
-    Use :func:`clear_cache` to force a reload (handy in tests).
-
-    Args:
-        market: Market identifier — ``'com'`` or ``'pe'``.
-
-    Returns:
-        :class:`MarketSelectors` with all selectors and market metadata.
-
-    Raises:
-        KeyError: If *market* not found in config.
-        FileNotFoundError: If ``markets.json`` doesn't exist (spike not done).
+    Supports dynamic stage overriding via ``base_url_override``,
+    ``casino_url_override``, or environment variables ``BETSSON_BASE_URL``
+    and ``BETSSON_CASINO_URL`` to seamlessly switch between testing and
+    production environments.
     """
-    global _cache  # noqa: PLW0603  — module-level cache is intentional
+    global _cache  # noqa: PLW0603
     if _cache is None:
         data = _load_markets()
         _cache = {}
@@ -190,7 +187,32 @@ def get_market_selectors(market: str = "com") -> MarketSelectors:
             f"Market '{market}' not found in {_MARKETS_JSON}. "
             f"Available: {list(_cache.keys())}"
         )
-    return _cache[market]
+
+    mkt = _cache[market]
+    env_base = base_url_override or os.getenv("BETSSON_BASE_URL") or os.getenv("BETSSON_URL")
+    env_casino = casino_url_override or os.getenv("BETSSON_CASINO_URL")
+
+    if env_base or env_casino:
+        resolved_url = env_base or mkt.url
+        resolved_casino = env_casino or (
+            f"{resolved_url.rstrip('/')}/en/casino" if env_base else mkt.casino_url
+        )
+        return MarketSelectors(
+            market=mkt.market,
+            url=resolved_url,
+            casino_url=resolved_casino,
+            locale=mkt.locale,
+            currency=mkt.currency,
+            currency_symbol=mkt.currency_symbol,
+            game_candidates=mkt.game_candidates,
+            keywords_insufficient=mkt.keywords_insufficient,
+            selectors=mkt.selectors,
+            number_format=mkt.number_format,
+            notes=mkt.notes,
+            active=mkt.active,
+        )
+
+    return mkt
 
 
 def get_active_markets() -> list[str]:

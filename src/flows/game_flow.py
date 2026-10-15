@@ -10,6 +10,7 @@ Money always in Decimal.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -208,12 +209,21 @@ class GameFlow:
         return outcome
 
     def _launch_browser(self) -> None:
-        """Launch Chromium with WebGL fallback arguments (R14)."""
-        launch_args = list(CHROMIUM_GPU_ARGS)
-        if self._headless:
-            launch_args.append("--headless=new")
-        self._browser = self._pw.chromium.launch(headless=self._headless, args=launch_args)
-        logger.info("[%s] Browser launched (headless=%s)", self._agent_id, self._headless)
+        """Launch browser engine (Firefox for antibot evasion, or Chromium)."""
+        browser_type = os.getenv("PLAYWRIGHT_BROWSER") or os.getenv("BROWSER_TYPE") or "chromium"
+        b_type = browser_type.strip().lower()
+
+        if b_type == "firefox":
+            self._browser = self._pw.firefox.launch(headless=self._headless)
+        elif b_type == "webkit":
+            self._browser = self._pw.webkit.launch(headless=self._headless)
+        else:
+            launch_args = list(CHROMIUM_GPU_ARGS)
+            if self._headless:
+                launch_args.append("--headless=new")
+            self._browser = self._pw.chromium.launch(headless=self._headless, args=launch_args)
+
+        logger.info("[%s] Browser launched (%s, headless=%s)", self._agent_id, b_type, self._headless)
 
     def _login_phase(self) -> None:
         """Context A: login without video recording to protect secrets (R1)."""
