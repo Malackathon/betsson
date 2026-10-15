@@ -28,7 +28,6 @@ El código está organizado en módulos `core`, `vision`, `orchestrator` y `agen
 | **Giro (scenario 1)** | ✅ | `GameFlow.execute_spin_cycle` hace click, detecta movimiento y estabilidad, y devuelve resultados. |
 | **Insufficient‑funds (scenario 2)** | ✅ | Se detecta el banner, se extrae el mensaje y el idioma, y el test pasa. |
 | **Reportes** | ✅ | `generate_html_report` crea `artifacts/report.html` con tabla de resultados y reproductor de vídeo. |
-| **Ejecución paralela** | ✅ | `pytest -m e2e -n 4` lanza los 4 agentes simultáneamente y genera 4 videos independientes. |
 | **Cobertura de pruebas** | ✅ | 170 unit tests + 4 E2E → **100 %** de los módulos críticos. |
 
 ---
@@ -64,12 +63,33 @@ copy .env.example .env
 # Opcional: HEADLESS=false  (para ver el navegador)
 ```
 ### 3️⃣ (Opcional) Guardar cookie
-1. Inicia sesión en Betsson con el navegador normal. 
-2. Exporta la cookie `sessionid` (u otro que mantenga la sesión) a `cookies.json` (ver bloque *Formato JSON* arriba).
-3. Exporta la variable de entorno:
-```powershell
-$env:PLAYWRIGHT_STORAGE_STATE = "betsson_cookie.json"
-```
+
+El login automático lo bloquea el antifraude de Betsson, así que se reutiliza una sesión iniciada a mano.
+
+1. Inicia sesión en Betsson (`betsson.es`) con el navegador normal y **no cierres sesión**.
+2. Exporta **todas** las cookies de Betsson a `cookies.json` (en la raíz del repo; está ignorado por git) con una extensión como *Cookie-Editor* → *Export → JSON*.
+3. En esa misma pestaña abre la consola del navegador (`F12` → *Console*) y ejecuta:
+
+   ```js
+   copy(JSON.stringify({origin: location.origin, localStorage: {...localStorage}, sessionStorage: {...sessionStorage}}))
+   ```
+
+   Pega el resultado del portapapeles en un archivo `storage.json` (raíz del repo, también ignorado por git).
+4. Importa la sesión y comprueba que está fresca:
+
+   ```bash
+   python scripts/import_cookies.py agent_com_s1 cookies.json storage.json
+   python scripts/check_session.py agent_com_s1
+   ```
+
+5. Lanza el test enseguida (las cookies de login caducan en ~45-60 min):
+
+   ```bash
+   python -m pytest tests/test_scenario_1_spin.py -k com_s1 -o addopts="" -s -o log_cli=true -o log_cli_level=INFO
+   ```
+
+> ⚠️ `cookies.json` y `storage.json` equivalen a tu contraseña de sesión: no los subas ni los compartas, y bórralos al terminar.
+
 ### 4️⃣ Ejecutar los tests
 | Acción | Comando | Qué hace |
 |--------|---------|----------|
