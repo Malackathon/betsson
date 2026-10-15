@@ -48,6 +48,27 @@ _HEADER_TEXTS_JS = r"""
 """
 
 
+_HEADER_CONTROLS_JS = r"""
+([maxTop, maxHeight, limit]) => [...document.querySelectorAll('button, a, [role="button"], fdsp-button, [aria-label]')]
+  .filter(e => { const r = e.getBoundingClientRect();
+    return r.width && r.height && r.top <= maxTop && r.bottom >= 0 && r.height <= maxHeight; })
+  .map(e => ({
+    tag: e.tagName.toLowerCase(),
+    aria: e.getAttribute('aria-label'), title: e.getAttribute('title'), testid: e.getAttribute('data-testid'),
+    text: (e.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 30)}))
+  .filter(c => !JSON.stringify(c).includes('@') && (c.aria || c.title || c.testid || c.text))
+  .slice(0, limit)
+"""
+
+
+def _header_controls_sample(page: Any, limit: int = 15) -> list[dict]:
+    """Clickable header controls (labels only): the balance may sit behind one of them."""
+    try:
+        return page.evaluate(_HEADER_CONTROLS_JS, [HEADER_MAX_TOP_PX, HEADER_MAX_HEIGHT_PX, limit])
+    except Exception:
+        return []
+
+
 def _header_text_sample(page: Any, limit: int = 12) -> list[str]:
     """Short header strings with digits/currency, e-mail-like ones excluded (privacy)."""
     try:
@@ -74,5 +95,6 @@ def find_balance_locator(page: Any, configured_selector: str, timeout_ms: int = 
         return probed
     raise LookupError(
         "No balance element found: configured selector absent and no money-like element in the header. "
-        f"Header strings with digits/currency: {_header_text_sample(page)}"
+        f"Header strings with digits/currency: {_header_text_sample(page)}. "
+        f"Header controls: {_header_controls_sample(page)}"
     )

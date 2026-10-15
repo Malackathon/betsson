@@ -147,13 +147,26 @@ class LobbyPage:
         try:
             self._balance_locator(timeout_ms)
         except Exception as exc:
+            shot = self._save_header_screenshot()
             raise RuntimeError(
                 f"[{self._agent_id}] Logged-in header (balance) not found with the saved session: it may be "
                 f"expired/rejected, or the 'balance_display' selector in config/markets.json does not match this "
                 f"site. Re-save the session with: python scripts/save_session.py {self._agent_id}. "
-                f"Detail: {str(exc)[:600]}"
+                f"Detail: {str(exc)[:900]}. Header screenshot: {shot}"
             ) from None
         self._logged_in = True
+
+    def _save_header_screenshot(self) -> str:
+        """Top strip of the page (header only) for diagnosing a missing balance; local, gitignored."""
+        try:
+            evidence = self._auth_state_dir.parent / self._agent_id / "evidence"
+            evidence.mkdir(parents=True, exist_ok=True)
+            path = evidence / "header_balance_not_found.png"
+            width = (self._page.viewport_size or {"width": 1280})["width"]
+            self._page.screenshot(path=str(path), clip={"x": 0, "y": 0, "width": width, "height": 140})
+            return str(path)
+        except Exception:
+            return "<screenshot unavailable>"
 
     def navigate_to_casino(self) -> None:
         """Navigate to casino lobby page."""

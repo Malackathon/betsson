@@ -71,3 +71,12 @@ def test_failure_message_lists_header_strings_but_never_emails(page):
     message = str(exc.value)
     assert "Casino 2026" in message
     assert "@" not in message
+
+
+def test_failure_message_lists_header_controls_so_a_hidden_balance_can_be_found(page):
+    _page_with(page, "<button aria-label='Mi cuenta'>Cuenta</button><a data-testid='deposit'>Depositar</a>")
+    with pytest.raises(LookupError) as exc:
+        find_balance_locator(page, ".nope", timeout_ms=300)
+    message = str(exc.value)
+    assert "Mi cuenta" in message
+    assert "deposit" in message
