@@ -123,6 +123,13 @@ class SubAgentWorker:
         # Soft checks runner
         self.runner = CheckRunner()
 
+    def _scrub(self, text: str) -> str:
+        """Replace the account's username/password with ``***`` wherever they appear."""
+        for secret in (self.password, self.username):  # longest-risk first: the password
+            if secret and secret.strip():
+                text = text.replace(secret, "***")
+        return text
+
     def ensure_directories(self) -> None:
         """Create required artifact subdirectories."""
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
@@ -159,13 +166,16 @@ class SubAgentWorker:
             else:
                 self._run_scenario_2()
         except Exception as exc:
-            logger.exception("SubAgentWorker %s encountered an unhandled error: %s", self.agent_id.value, exc)
+            # Playwright's call log echoes values passed to fill(): never let credentials
+            # reach logs, result JSON or reports (no traceback either: it repeats the message).
+            safe_error = self._scrub(f"{type(exc).__name__}: {exc}")
+            logger.error("SubAgentWorker %s encountered an unhandled error: %s", self.agent_id.value, safe_error)
             self.runner.run_check(
                 check_id="CRITICAL_ERROR",
                 name="Ejecución de SubAgente sin excepciones críticas",
                 expected="Ejecución limpia",
-                observed=f"{type(exc).__name__}: {exc}",
-                detail=str(exc),
+                observed=safe_error,
+                detail=safe_error,
                 status=CheckStatus.ERROR,
             )
 

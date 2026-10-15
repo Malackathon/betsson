@@ -76,6 +76,29 @@ def test_live_worker_reports_an_error_check_instead_of_crashing(tmp_path, monkey
     assert "browser exploded" in report.checks[-1].observed
 
 
+def test_credentials_in_playwright_call_logs_never_reach_the_report(tmp_path, monkeypatch, caplog):
+    def leaky(**kwargs):
+        raise RuntimeError('Locator.fill: Timeout\n  - fill("jane@example.com")\n  - fill("S3cretPass!")')
+
+    monkeypatch.setattr(live_runner, "run_live_scenario", leaky)
+    worker = SubAgentWorker(
+        agent_id=AgentId.agent_com_s1,
+        artifacts_dir=tmp_path,
+        username="jane@example.com",
+        password="S3cretPass!",
+        live=True,
+    )
+
+    with caplog.at_level("DEBUG"):
+        worker.execute()
+
+    written = (tmp_path / "result_agent_com_s1.json").read_text(encoding="utf-8")
+    for leaked in ("jane@example.com", "S3cretPass!"):
+        assert leaked not in written
+        assert leaked not in caplog.text
+    assert "***" in written
+
+
 def test_non_live_worker_never_touches_the_live_runner(tmp_path, monkeypatch):
     monkeypatch.setattr(live_runner, "run_live_scenario", lambda **kw: pytest.fail("live path used"))
     worker = SubAgentWorker(agent_id=AgentId.agent_com_s1, artifacts_dir=tmp_path)

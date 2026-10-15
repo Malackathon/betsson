@@ -67,6 +67,7 @@ _BALANCE_POLL_TIMEOUT_S = 15.0
 _BALANCE_STABILITY_READS = 3
 _PAGE_LOAD_TIMEOUT_MS = 30_000
 _NAV_TIMEOUT_MS = 15_000
+_OVERLAY_APPEAR_TIMEOUT_MS = 6_000
 
 
 class LobbyPage:
@@ -249,8 +250,18 @@ class LobbyPage:
         return self._mkt.currency_symbol
 
     def _dismiss_overlays(self) -> None:
-        """Dismiss overlay popups (cookies, promos, banners)."""
+        """Dismiss overlay popups (cookies, promos, banners).
+
+        The cookie banner is rendered after hydration, so wait for it to show up instead of
+        sleeping a fixed second: otherwise it appears later and intercepts the login click.
+        """
         self._page.wait_for_timeout(1000)
+        try:
+            self._page.locator(", ".join(OVERLAY_DISMISS_SELECTORS[:5])).first.wait_for(
+                state="visible", timeout=_OVERLAY_APPEAR_TIMEOUT_MS
+            )
+        except Exception:
+            logger.debug("[%s] No cookie/overlay appeared within %d ms", self._agent_id, _OVERLAY_APPEAR_TIMEOUT_MS)
         for selector in OVERLAY_DISMISS_SELECTORS:
             try:
                 loc = self._page.locator(selector)

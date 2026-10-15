@@ -122,5 +122,18 @@ def main(agent_id: str) -> None:
         browser.close()
 
 
+def run_safely(agent_id: str) -> None:
+    """Run main() but never print credentials: Playwright echoes fill() values in errors."""
+    creds = get_settings().get_credentials(agent_id)
+    try:
+        main(agent_id)
+    except Exception as exc:
+        message = f"{type(exc).__name__}: {exc}"
+        for secret in (creds.password, creds.username):
+            if secret and secret.strip():
+                message = message.replace(secret, "***")
+        sys.exit(f"FAILED (credentials masked): {message}")
+
+
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "agent_com_s1")
+    run_safely(sys.argv[1] if len(sys.argv) > 1 else "agent_com_s1")
