@@ -97,9 +97,18 @@ Las demás ramas deben diseñar sus APIs contra estos nombres **asumiendo que ex
      - Indicador explícito `[PASSED]` o `[FAILED]` / `[ERROR]` a nivel de agente y global.
      - Bloque de detalles para cada fallo (`FAIL` o `ERROR`): ID del check, nombre, valores esperados vs observados, explicación detallada del fallo y ruta a la evidencia/captura.
      - Método `write_log(path: Path | str = "artifacts/test_run.log") -> Path` en `MasterReport` para escribirlo en disco.
-6. **Tests unitarios TDD** en `tests/unit/` para money (ambos locales de número), checks, schemas y generación de logs. Sin red, sin credenciales. Deben pasar con `pytest tests/unit`.
+6. **Contratos y Utilidades para UI Adaptativa y Self-Healing (Resiliencia ante cambios de Proveedor/Canvas)**:
+   - En `src/models/schemas.py`:
+     - **`ScreenState`** (enum: `READY_HUD_VISIBLE`, `SPLASH_SCREEN`, `LOADING`, `MODAL_VISIBLE`, `UNKNOWN`): estado visual del juego para reaccionar dinámicamente ante pantallas de bienvenida, intros o modales.
+     - **`BoundingBox`**: `x: float`, `y: float`, `width: float`, `height: float` representando dimensiones y posición del canvas/iframe en el viewport.
+     - **`NormalizedPoint`**: `x: float`, `y: float` (rango $0.0 \le x, y \le 1.0$) con método `to_absolute(box: BoundingBox) -> tuple[int, int]` para calcular coordenadas absolutas de clic inmunes a resolución, redimensionado responsive o cambio de aspect ratio.
+     - **`GeminiSpinLocation` adaptativo**: soporte de `to_absolute(box: BoundingBox) -> tuple[int, int]` a partir de sus coordenadas normalizadas `x` e `y`.
+     - **`GeminiModalReading`**: `raw_text: str`, `has_modal: bool`, `modal_type: str | None`, `dismiss_target: NormalizedPoint | None`, `detected_language: str | None`, `legible: bool`.
+   - En `src/core/checks.py`:
+     - Helper y check para validar que las coordenadas visuales detectadas se encuentren dentro de los límites válidos del canvas.
+7. **Tests unitarios TDD** en `tests/unit/` para money (ambos locales de número), checks, schemas, logs y utilidades adaptativas. Sin red, sin credenciales. Deben pasar con `pytest tests/unit`.
 
-**Definición de hecho:** `pytest tests/unit` en verde, tipado completo, sin floats en lógica de dinero, generación de `test_run.log` testeada con casos exitosos y fallidos.
+**Definición de hecho:** `pytest tests/unit` en verde, tipado completo, sin floats en lógica de dinero, generación de `test_run.log` y contratos/coordenadas adaptativas testeadas.
 
 ---
 
