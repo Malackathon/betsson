@@ -126,11 +126,51 @@ El login automático lo bloquea el antifraude de Betsson, así que se reutiliza 
 > python scripts/simulate_report.py docs/demo_report_SIMULADO
 > ```
 
+### 6️⃣ Logs de la ejecución
+
+| Log | Dónde | Cuándo es útil |
+|-----|-------|----------------|
+| **Log en vivo** (cada paso del bot: sesión, juego, clic, saldo) | Terminal | Seguir la ejecución y ver dónde se queda. |
+| **Log a archivo** | `artifacts/run.log` (si lo pides, ver abajo) | Guardar el log completo para compartirlo o revisarlo después. |
+| **Diagnóstico por agente** (resumen + detalle de cada fallo) | `artifacts/test_run.log` (se escribe al terminar cada ejecución de pytest) | Entender qué check falló y por qué. |
+| **Tráfico de red del juego** (qué peticiones hizo, sin cookies ni tokens) | `artifacts/<agent_id>/network/game_transactions.json` y `traffic_overview.json` | Si el giro no se reconoce, ver a qué servidor habla el juego. |
+| **Captura de dónde falló** | `artifacts/<agent_id>/evidence/game_phase_failure.png` y `header_balance_not_found.png` | Ver qué había en pantalla cuando falló. |
+
+**Log en vivo en la terminal:**
+
+```bash
+python -m pytest tests/test_scenario_1_spin.py -k com_s1 -o addopts="" -s -o log_cli=true -o log_cli_level=INFO
+```
+
+**Guardarlo además en un archivo** (las mismas opciones, más `log_file`):
+
+```bash
+python -m pytest tests/test_scenario_1_spin.py -k com_s1 -o addopts="" -s -o log_cli=true -o log_cli_level=INFO -o log_file=artifacts/run.log -o log_file_level=INFO
+```
+
+**Qué buscar en el log:**
+
+| Línea | Qué significa |
+|-------|---------------|
+| `Reusing saved session ... (automated login skipped)` | Está usando la sesión importada. |
+| `Session checkpoint '...': logged in` | La sesión sigue activa. `SESSION LOST` indica que se perdió en ese punto. |
+| `Balance stable at ... (3 reads)` | Leyó el saldo de Betsson. |
+| `Click N produced no spin request; re-locating the Spin button` | El clic no generó un giro y se vuelve a buscar el botón. |
+| `Using the stored, previously verified Spin location (no AI call)` | Usa la posición del botón guardada de una ejecución anterior. |
+| `No spin request recognised. The game's recent requests were: [...]` | No se detectó el giro; la lista dice a qué habla el juego. |
+| `Game phase failed. Recent events ...` | Fallo al abrir el juego, con las últimas navegaciones y errores HTTP. |
+
+> 🔒 **Privacidad:** los errores sustituyen el usuario y la contraseña por `***`, y los logs de red guardan solo `host/ruta` (nunca parámetros, cookies ni tokens). Aun así, `cookies.json` y `storage.json` no se comparten nunca.
+>
+> Ejemplo de `test_run.log` (de la simulación, datos ficticios): [`docs/demo_report_SIMULADO/test_run.log`](docs/demo_report_SIMULADO/test_run.log)
+
 ## 📦 Artefactos generados por cada ejecución
 ```
 artifacts/
 ├─ report.html               # reporte interactivo con tabla y video embed
 ├─ report.md                 # resumen markdown del reporte
+├─ test_run.log              # diagnóstico por agente y detalle de cada fallo
+├─ run.log                   # (opcional) log completo si usas -o log_file=artifacts/run.log
 ├─ agent_com_s1/
 │   ├─ result_agent_com_s1.json
 │   ├─ evidence/ …
