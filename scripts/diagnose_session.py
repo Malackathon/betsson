@@ -25,6 +25,7 @@ from src.browser.selectors import get_market_selectors  # noqa: E402
 from src.browser.session_state import apply_session_storage, saved_session_path  # noqa: E402
 
 SETTLE_MS = 10_000
+ACCOUNT_HINTS = ("account", "user", "session", "auth", "wallet", "balance", "profile", "player", "login", "me")
 BALANCE_LIKE = (
     "[data-testid*='balance' i], [class*='balance' i], [id*='balance' i], [data-testid*='wallet' i], "
     "[class*='wallet' i], [class*='saldo' i], [class*='account' i], [data-testid*='user' i]"
@@ -51,12 +52,17 @@ def main(agent_id: str) -> None:
         apply_session_storage(context, session)
         page = context.new_page()
         failures: Counter[str] = Counter()
-        page.on(
-            "response",
-            lambda r: failures.update([f"{r.request.method} {r.status} {urlsplit(r.url).path}"])
-            if "/api/" in r.url and r.status >= 400
-            else None,
-        )
+        account_calls: Counter[str] = Counter()
+
+        def record(response) -> None:
+            path = urlsplit(response.url).path
+            line = f"{response.request.method} {response.status} {path}"
+            if "/api/" in response.url and response.status >= 400:
+                failures.update([line])
+            if "/api/" in response.url and any(hint in path.lower() for hint in ACCOUNT_HINTS):
+                account_calls.update([line])
+
+        page.on("response", record)
         print(f"browser={browser_name} casino_url={mkt.casino_url}")
         page.goto(mkt.casino_url, timeout=60_000)
         LobbyPage(page=page, market=market, agent_id=agent_id)._dismiss_overlays()
@@ -70,6 +76,8 @@ def main(agent_id: str) -> None:
         print("visible header buttons:", page.locator("button, fdsp-button, a[role='button']").evaluate_all(JS_BUTTONS))
         print("balance/account-like elements:", page.locator(BALANCE_LIKE).evaluate_all(JS_DESCRIBE))
         print("API calls with status >= 400:", dict(failures) or "none")
+        print("account/session-related API calls (any status):", dict(account_calls) or "none")
+        print("cookies loaded:", len(context.cookies()), "| localStorage keys:", page.evaluate("Object.keys(localStorage).length"))
         browser.close()
 
 
