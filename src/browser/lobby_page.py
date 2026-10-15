@@ -168,6 +168,13 @@ class LobbyPage:
         except Exception:
             return "<screenshot unavailable>"
 
+    def is_logged_out(self) -> bool:
+        """True when the header offers the login button again (the session was lost)."""
+        try:
+            return self._page.locator(self._sel.login_button).first.is_visible()
+        except Exception:
+            return False
+
     def navigate_to_casino(self) -> None:
         """Navigate to casino lobby page."""
         logger.info("[%s] Navigating to casino: %s", self._agent_id, self._mkt.casino_url)

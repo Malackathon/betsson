@@ -18,7 +18,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
-from playwright.sync_api import Browser, BrowserContext, Playwright
+from playwright.sync_api import Browser, BrowserContext, Page, Playwright
 
 from src.browser.game_canvas import (
     CHROMIUM_GPU_ARGS,
@@ -29,6 +29,7 @@ from src.browser.game_canvas import (
 from src.browser.lobby_page import LobbyPage
 from src.browser.selectors import get_market_selectors
 from src.browser.visual_debug import CURSOR_SCRIPT, read_visual_settings
+from src.browser.session_watch import SessionWatch
 from src.browser.session_state import apply_session_storage, find_reusable_session
 from src.flows.spin_runner import SpinRun, run_spin_with_bonus_retry
 from src.network.models import RoundResult, SpinAttempt, SpinAttemptStatus
@@ -111,6 +112,7 @@ class GameFlow:
         monitor: NetworkMonitor | None = None,
     ) -> None:
         self._monitor = monitor or NetworkMonitor()
+        self._watch = SessionWatch()
         self._pw = playwright
         self._market = market
         self._agent_id = agent_id
@@ -351,10 +353,23 @@ class GameFlow:
         auth_dir = self._artifacts_dir.parent / _AUTH_STATE_DIR_NAME
         self._lobby = LobbyPage(page=page, market=self._market, agent_id=self._agent_id, auth_state_dir=auth_dir)
 
+        self._watch.attach(page)
+        try:
+            self._open_game(page)
+        except Exception as exc:
+            # Explain a lost session: recent navigations/HTTP errors (host/path only, no secrets).
+            self._watch.checkpoint("failure", logged_out=self._lobby.is_logged_out())
+            logger.error("[%s] Game phase failed. %s", self._agent_id, self._watch.summary())
+            raise RuntimeError(f"{exc} | {self._watch.summary()}") from None
+
+    def _open_game(self, page: Page) -> None:
+        assert self._lobby is not None
         self._lobby.navigate_to_casino()
         if self._reused_session:
             self._lobby.assert_logged_in()
+        self._watch.checkpoint("casino loaded", self._lobby.is_logged_out())
         self._game_name = self._lobby.search_and_open_game()
+        self._watch.checkpoint(f"after opening '{self._game_name}'", self._lobby.is_logged_out())
         if self._callbacks.on_game_opened:
             self._callbacks.on_game_opened(self._game_name)
 
@@ -367,6 +382,7 @@ class GameFlow:
         self._canvas.locate_iframe()
         self._canvas.dismiss_intros()
         self._lobby.dismiss_game_wrappers()
+        self._watch.checkpoint("game frame ready", self._lobby.is_logged_out())
         logger.info("[%s] Game '%s' ready", self._agent_id, self._game_name)
 
     def _get_spin_coords(
@@ -450,6 +466,7 @@ class GameFlow:
             logger.info("[%s] Keeping the browser open for %ds (KEEP_OPEN_S)", self._agent_id, self._visual.keep_open_s)
             time.sleep(self._visual.keep_open_s)
         self._monitor.detach()
+        self._watch.detach()
         for ctx in (self._ctx_game, self._ctx_login):
             if ctx is not None:
                 try:
