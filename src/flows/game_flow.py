@@ -77,6 +77,8 @@ class SpinOutcome:
     final_screenshot: Path | None = None
     bonus_retries: int = 0
     network_evidence: Path | None = None
+    # True only when the in-game balance before AND after was actually read from the server.
+    server_balance_known: bool = False
 
 
 @dataclass
@@ -237,6 +239,7 @@ class GameFlow:
         net_after = self._monitor.last_balance
         if net_before is not None and net_after is not None:
             outcome.hud_credit_before, outcome.hud_credit_after = net_before, net_after
+            outcome.server_balance_known = True
         outcome.bet_amount = outcome.bet_amount or self._monitor.last_bet or Decimal("0")
         outcome.network_evidence = self._save_network_evidence()
 

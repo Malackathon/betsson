@@ -193,6 +193,7 @@ def _s2_outcome(tmp_path: Path, attempt: SpinAttempt | None = None, **overrides)
         currency_observed="€",
         spin_attempt=attempt or SpinAttempt(SpinAttemptStatus.NO_TRAFFIC),
         final_screenshot=shot,
+        server_balance_known=True,
     )
     base.update(overrides)
     return SpinOutcome(**base)
@@ -315,3 +316,32 @@ def test_scenario_1_skips_visual_reaction_without_a_before_screenshot(tmp_path):
     runner = CheckRunner()
     evaluate_scenario_1(runner, _s1_outcome(tmp_path), _ctx(FakeInspector(GOOD_S1_READING)))
     assert _status(runner)["S1.05v"] is CheckStatus.SKIP
+
+
+def test_scenario_2_does_not_pass_vacuously_when_the_server_balance_was_never_read(tmp_path):
+    """0 == 0 because nothing was parsed is NOT a verified 'balance unchanged'."""
+    outcome = _s2_outcome(
+        tmp_path, hud_credit_before=Decimal("0"), hud_credit_after=Decimal("0"), server_balance_known=False
+    )
+    runner = CheckRunner()
+
+    evaluate_scenario_2(runner, outcome, _ctx(FakeInspector(GOOD_S2_READING)))
+
+    statuses = _status(runner)
+    assert statuses["S2.06"] is CheckStatus.FAIL
+    assert statuses["S2.02"] is CheckStatus.FAIL
+    assert statuses["S2.01"] is CheckStatus.FAIL
+    detail = next(c.detail for c in runner.results if c.id == "S2.06")
+    assert "no se pudo leer" in detail.lower()
+
+
+def test_a_real_zero_balance_account_still_passes_when_the_server_reported_it(tmp_path):
+    outcome = _s2_outcome(
+        tmp_path, hud_credit_before=Decimal("0"), hud_credit_after=Decimal("0"), server_balance_known=True
+    )
+    runner = CheckRunner()
+
+    evaluate_scenario_2(runner, outcome, _ctx(FakeInspector(GOOD_S2_READING)))
+
+    assert _status(runner)["S2.06"] is CheckStatus.PASS
+    assert _status(runner)["S2.01"] is CheckStatus.PASS

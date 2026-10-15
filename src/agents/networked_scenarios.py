@@ -36,6 +36,10 @@ logger = logging.getLogger(__name__)
 
 ZERO = Decimal("0")
 UNREADABLE = "no readable value on screen"
+NOT_READ = (
+    "No se pudo leer el saldo del juego desde la red (¿nombres de campo distintos?): "
+    "no es verificable, no se da por bueno"
+)
 
 
 class GroundedVision(Protocol):
@@ -252,22 +256,24 @@ def evaluate_scenario_2(runner: CheckRunner, outcome: SpinOutcome, ctx: Scenario
                                 ctx.currency_symbol, ctx.market)
     screen = _verify_screen(ctx, outcome.final_screenshot, reference)
 
-    precondition = bet > ZERO and before < bet
+    known = outcome.server_balance_known
+    precondition = known and bet > ZERO and before < bet
     runner.run_check(
         "S2.01", "Precondición: saldo < apuesta",
-        expected="saldo < apuesta", observed=f"saldo={before}, apuesta={bet}",
+        expected="saldo < apuesta", observed=f"saldo={before if known else '?'}, apuesta={bet}",
         detail="Cuenta preparada (saldo según el servidor)" if precondition
-        else "Cuenta no preparada o apuesta desconocida: el saldo cubre la apuesta",
+        else (NOT_READ if not known else "Cuenta no preparada o apuesta desconocida: el saldo cubre la apuesta"),
         status=_status(precondition),
     )
 
-    unchanged = before == after
+    unchanged = known and before == after
     rejected = (attempt is None or attempt.status in (SpinAttemptStatus.REJECTED, SpinAttemptStatus.NO_TRAFFIC))
     runner.run_check(
         "S2.02", "El giro es rechazado (no hay giro pagado)",
         expected="True", observed=str(rejected and unchanged),
         detail=f"estado del giro={attempt.status.value if attempt else 'sin clic'}; "
-        f"saldo servidor antes={before}, después={after}",
+        f"saldo servidor antes={before if known else '?'}, después={after if known else '?'}"
+        + ("" if known else f". {NOT_READ}"),
         status=_status(rejected and unchanged),
     )
 
@@ -283,7 +289,13 @@ def evaluate_scenario_2(runner: CheckRunner, outcome: SpinOutcome, ctx: Scenario
         expected=ctx.currency_symbol, observed=screen.detail("currency"),
         detail=screen.detail("currency"), status=_tri_status(screen.matches("currency")),
     )
-    check_balance_unchanged(runner, "S2.06", "Saldo in-game sin cambios", before, after)
+    if known:
+        check_balance_unchanged(runner, "S2.06", "Saldo in-game sin cambios", before, after)
+    else:
+        runner.run_check(
+            "S2.06", "Saldo in-game sin cambios", expected="antes == después", observed="sin datos",
+            detail=NOT_READ, status=CheckStatus.FAIL,
+        )
     _visual_balance_check(runner, screen)
     check_balance_unchanged(runner, "S2.07", "Saldo Betsson sin cambios", outcome.balance_before, outcome.balance_after)
 
