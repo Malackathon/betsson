@@ -23,6 +23,7 @@ from src.core.checks import (
 from src.flows.game_flow import SpinOutcome
 from src.models.schemas import CheckStatus
 from src.network.models import SpinAttemptStatus
+from src.vision.screen_change import REACTION_THRESHOLD, screen_change
 from src.vision.grounding import (
     FieldComparison,
     GroundedScreenReading,
@@ -102,6 +103,7 @@ def evaluate_scenario_1(runner: CheckRunner, outcome: SpinOutcome, ctx: Scenario
         screen = _verify_screen(ctx, outcome.final_screenshot, reference)
     _screen_checks_s1(runner, screen, settled)
     _spin_lifecycle_checks(runner, attempt, rnd)
+    _visual_reaction_check(runner, outcome)
 
     bonus_left = bool(rnd and rnd.bonus_triggered)
     _bonus_check(runner, rnd, outcome.bonus_retries)
@@ -170,6 +172,22 @@ def _spin_lifecycle_checks(runner: CheckRunner, attempt, rnd) -> None:
         expected="True", observed=str(done),
         detail="El servidor liquidó la ronda (na=s)" if done else (attempt.detail if attempt else "sin intento de giro"),
         status=_status(done),
+    )
+
+
+def _visual_reaction_check(runner: CheckRunner, outcome: SpinOutcome) -> None:
+    """The PDF asks to verify FROM THE SCREEN that the game reacted: compare before/after captures."""
+    shots = [p for p in outcome.screenshots if p is not None]
+    before, after = (shots[0] if shots else None), outcome.final_screenshot
+    change = screen_change(before, after) if before and after and before != after else None
+    if change is None:
+        runner.skip("S1.05v", "El juego reaccionó en pantalla", "Sin capturas antes/después comparables")
+        return
+    runner.run_check(
+        "S1.05v", "El juego reaccionó en pantalla",
+        expected=f"cambio visual >= {REACTION_THRESHOLD}", observed=f"{change:.4f}",
+        detail="Diferencia entre la captura previa al giro y la tomada al liquidarse la ronda (sin IA)",
+        status=_status(change >= REACTION_THRESHOLD),
     )
 
 

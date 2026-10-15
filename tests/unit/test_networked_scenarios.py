@@ -274,3 +274,44 @@ def test_scenario_2_without_screenshot_fails_visual_checks(tmp_path, missing):
     evaluate_scenario_2(runner, outcome, _ctx(FakeInspector(GOOD_S2_READING)))
 
     assert _status(runner)["S2.03"] is CheckStatus.FAIL
+
+
+# ---------------------------------------------- visual reaction (PDF: "verify from the screen")
+
+
+def _shots(tmp_path, changed: bool):
+    from PIL import Image
+
+    pre, post = tmp_path / "pre.png", tmp_path / "post.png"
+    Image.new("RGB", (200, 100), (10, 10, 10)).save(pre)
+    after = Image.new("RGB", (200, 100), (10, 10, 10))
+    if changed:
+        after.paste(Image.new("RGB", (80, 50), (240, 200, 30)), (30, 20))
+    after.save(post)
+    return pre, post
+
+
+def test_scenario_1_passes_visual_reaction_when_the_screen_changed(tmp_path):
+    pre, post = _shots(tmp_path, changed=True)
+    outcome = _s1_outcome(tmp_path, final_screenshot=post, screenshots=[pre, post])
+    runner = CheckRunner()
+
+    evaluate_scenario_1(runner, outcome, _ctx(FakeInspector(GOOD_S1_READING)))
+
+    assert _status(runner)["S1.05v"] is CheckStatus.PASS
+
+
+def test_scenario_1_fails_visual_reaction_when_the_screen_did_not_change(tmp_path):
+    pre, post = _shots(tmp_path, changed=False)
+    outcome = _s1_outcome(tmp_path, final_screenshot=post, screenshots=[pre, post])
+    runner = CheckRunner()
+
+    evaluate_scenario_1(runner, outcome, _ctx(FakeInspector(GOOD_S1_READING)))
+
+    assert _status(runner)["S1.05v"] is CheckStatus.FAIL
+
+
+def test_scenario_1_skips_visual_reaction_without_a_before_screenshot(tmp_path):
+    runner = CheckRunner()
+    evaluate_scenario_1(runner, _s1_outcome(tmp_path), _ctx(FakeInspector(GOOD_S1_READING)))
+    assert _status(runner)["S1.05v"] is CheckStatus.SKIP
