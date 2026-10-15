@@ -80,3 +80,29 @@ def test_failure_message_lists_header_controls_so_a_hidden_balance_can_be_found(
     message = str(exc.value)
     assert "Mi cuenta" in message
     assert "deposit" in message
+
+
+SHADOW_WIDGET = """
+<x-wallet></x-wallet>
+<script>
+class XWallet extends HTMLElement {
+  constructor() { super(); this.attachShadow({mode: 'open'}).innerHTML =
+    "<button aria-label='Mi cuenta'>Cuenta</button><span class='amt'>99,80 €</span>"; }
+}
+customElements.define('x-wallet', XWallet);
+</script>
+"""
+
+
+def test_balance_inside_a_shadow_root_is_found(page):
+    page.set_content(f"<html><body style='margin:0'><header style='height:60px'>{SHADOW_WIDGET}</header></body></html>")
+    loc = find_balance_locator(page, ".nope", timeout_ms=300)
+    assert loc.inner_text() == "99,80 €"
+
+
+def test_header_controls_inside_shadow_roots_are_listed(page):
+    page.set_content(f"<html><body style='margin:0'><header style='height:60px'>{SHADOW_WIDGET.replace('99,80 €', 'x')}"
+                     "</header></body></html>")
+    with pytest.raises(LookupError) as exc:
+        find_balance_locator(page, ".nope", timeout_ms=300)
+    assert "Mi cuenta" in str(exc.value)
