@@ -137,3 +137,4 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         json_path,
         html_path,
     )
+

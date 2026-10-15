@@ -122,3 +122,4 @@ class GameFlowProtocol(Protocol):
     def check_insufficient_funds_banner(self) -> tuple[bool, str, str]:
         """Check for insufficient funds alert (location, message_text, raw_evidence)."""
         ...
+

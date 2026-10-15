@@ -212,3 +212,4 @@ def generate_html_report(
 </html>
 """
     return html_content
+

@@ -139,3 +139,4 @@ def generate_markdown_summary(master_report: MasterReport) -> str:
     ])
 
     return "\n".join(lines)
+

@@ -37,3 +37,4 @@ def record_evidence_screenshot(
     output_path.write_bytes(image_bytes)
     logger.debug("Evidence screenshot saved to %s (%s)", output_path, description)
     return output_path
+

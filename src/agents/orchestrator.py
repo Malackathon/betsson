@@ -218,3 +218,4 @@ if __name__ == "__main__":
         report = orchestrator.run_all()
 
     print(f"Master Execution Finished: {report.total_pass} passed, {report.total_fail} failed, all_passed={report.all_passed}")
+

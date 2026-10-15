@@ -42,3 +42,4 @@ def test_scenario_1_spin(
     failures = [c for c in report.checks if c.status == CheckStatus.FAIL]
     failure_details = "; ".join(f"{c.id} ({c.name}): {c.detail}" for c in failures)
     assert report.overall == CheckStatus.PASS, f"Checks failed for {agent_id.value}: {failure_details}"
+

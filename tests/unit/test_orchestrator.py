@@ -415,3 +415,4 @@ def test_orchestrator_save_reports(tmp_path: Path, sample_subagent_reports: list
     # Re-reading json matches
     reloaded = MasterReport.model_validate_json(json_p.read_text(encoding="utf-8"))
     assert len(reloaded.reports) == 4
+

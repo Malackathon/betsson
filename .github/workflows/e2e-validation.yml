@@ -150,3 +150,4 @@ jobs:
             echo "::error::E2E test execution completed with failed checks or test errors. See summary and HTML report."
             exit 1
           fi
+
