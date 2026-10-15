@@ -249,7 +249,74 @@ class TestMasterReport:
         master = MasterReport(reports=[])
         assert master.total_pass == 0
         assert master.total_fail == 0
+        assert master.total_error == 0
         assert master.all_passed is False
+
+    def test_subagent_report_to_log_text_passed(self) -> None:
+        """Verify log text format for a completely passed run."""
+        rep = self._make_report(
+            AgentId.agent_com_s1, Market.COM, [CheckStatus.PASS, CheckStatus.INFO]
+        )
+        log = rep.to_log_text()
+        assert "SubAgent: agent_com_s1" in log
+        assert "Market: COM" in log
+        assert "Status: [PASS]" in log
+        assert "[PASS ] chk_0: Check 0" in log
+        assert "FAILURE DIAGNOSTICS" not in log
+
+    def test_subagent_report_to_log_text_with_failures(self) -> None:
+        """Verify failure diagnostics block when a check fails."""
+        now = datetime.now(timezone.utc)
+        checks = [
+            CheckResult(id="S1.01", name="Lobby Balance", status=CheckStatus.PASS),
+            CheckResult(
+                id="S1.09",
+                name="In-game Reconcile",
+                expected="100.50",
+                observed="98.00",
+                detail="Expected 100.50 after spin, observed 98.00 (diff=2.50)",
+                status=CheckStatus.FAIL,
+            ),
+        ]
+        rep = SubAgentReport(
+            agent_id=AgentId.agent_com_s1,
+            market=Market.COM,
+            scenario=1,
+            checks=checks,
+            evidence_dir=Path("artifacts/agent_com_s1"),
+            started_at=now,
+            finished_at=now,
+        )
+        log = rep.to_log_text()
+        assert "Status: [FAIL]" in log
+        assert "FAILURE DIAGNOSTICS:" in log
+        assert "Check [FAIL] S1.09 - In-game Reconcile:" in log
+        assert "Expected: 100.50" in log
+        assert "Observed: 98.00" in log
+        assert "Detail:   Expected 100.50 after spin" in log
+        assert "Evidence: artifacts/agent_com_s1" in log
+
+    def test_master_report_to_log_text_and_write_log(self, tmp_path: Path) -> None:
+        """Verify master report log formatting and file writing."""
+        rep1 = self._make_report(
+            AgentId.agent_com_s1, Market.COM, [CheckStatus.PASS]
+        )
+        rep2 = self._make_report(
+            AgentId.agent_pe_s2, Market.PE, [CheckStatus.FAIL]
+        )
+        master = MasterReport(reports=[rep1, rep2])
+        log = master.to_log_text()
+
+        assert "TEST RUN LOG: SUITE FAILED" in log
+        assert "Summary: Total Reports: 2 | Total Checks: 2 | PASS: 1 | FAIL: 1 | ERROR: 0" in log
+        assert "FINAL VERDICT: SUITE FAILED" in log
+
+        # Test writing log to disk
+        out_file = tmp_path / "logs" / "test_run.log"
+        written = master.write_log(out_file)
+        assert written == out_file
+        assert out_file.exists()
+        assert out_file.read_text(encoding="utf-8") == log
 
 
 class TestGeminiContracts:

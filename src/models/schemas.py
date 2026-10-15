@@ -150,6 +150,44 @@ class SubAgentReport(BaseModel):
             return CheckStatus.PASS
         return CheckStatus.FAIL
 
+    def to_log_text(self) -> str:
+        """Format the subagent execution results into a readable text log."""
+        overall_str = self.overall.value if hasattr(self.overall, "value") else str(self.overall)
+        ev_path = self.evidence_dir.as_posix()
+        lines = [
+            "=" * 80,
+            f"SubAgent: {self.agent_id} | Market: {self.market} | Scenario: {self.scenario} | Status: [{overall_str}]",
+            f"Started:  {self.started_at.isoformat()} | Finished: {self.finished_at.isoformat()}",
+            f"Evidence: {ev_path}",
+        ]
+        if self.video_path:
+            lines.append(f"Video:    {self.video_path.as_posix()}")
+        lines.append("-" * 80)
+        lines.append("CHECKS:")
+
+        failures: list[CheckResult] = []
+        for check in self.checks:
+            c_status = check.status.value if hasattr(check.status, "value") else str(check.status)
+            lines.append(f"  [{c_status:5}] {check.id}: {check.name}")
+            if check.status in (CheckStatus.FAIL, CheckStatus.ERROR):
+                failures.append(check)
+
+        if failures:
+            lines.append("-" * 80)
+            lines.append("FAILURE DIAGNOSTICS:")
+            for f in failures:
+                f_status = f.status.value if hasattr(f.status, "value") else str(f.status)
+                lines.append(f"  * Check [{f_status}] {f.id} - {f.name}:")
+                if f.expected is not None:
+                    lines.append(f"      Expected: {f.expected}")
+                if f.observed is not None:
+                    lines.append(f"      Observed: {f.observed}")
+                if f.detail:
+                    lines.append(f"      Detail:   {f.detail}")
+                lines.append(f"      Evidence: {ev_path}")
+        lines.append("=" * 80)
+        return "\n".join(lines)
+
 
 class MasterReport(BaseModel):
     """Aggregated report consolidating all sub-agent execution runs.
@@ -183,6 +221,16 @@ class MasterReport(BaseModel):
         )
 
     @property
+    def total_error(self) -> int:
+        """Count of all checks with ERROR status across all sub-agent reports."""
+        return sum(
+            1
+            for report in self.reports
+            for check in report.checks
+            if check.status == CheckStatus.ERROR
+        )
+
+    @property
     def all_passed(self) -> bool:
         """True if every SubAgentReport.overall is PASS.
 
@@ -191,6 +239,48 @@ class MasterReport(BaseModel):
         if not self.reports:
             return False
         return all(report.overall == CheckStatus.PASS for report in self.reports)
+
+    def to_log_text(self) -> str:
+        """Format the aggregated multi-agent execution results into a comprehensive log."""
+        suite_verdict = "ALL PASSED" if self.all_passed else "SUITE FAILED"
+        total_checks = sum(len(r.checks) for r in self.reports)
+        lines = [
+            "#" * 80,
+            f"                         TEST RUN LOG: {suite_verdict}",
+            "#" * 80,
+            (
+                f"Summary: Total Reports: {len(self.reports)} | Total Checks: {total_checks} | "
+                f"PASS: {self.total_pass} | FAIL: {self.total_fail} | ERROR: {self.total_error}"
+            ),
+            "",
+        ]
+
+        for report in self.reports:
+            lines.append(report.to_log_text())
+            lines.append("")
+
+        lines.extend([
+            "#" * 80,
+            f"FINAL VERDICT: {suite_verdict}",
+            "#" * 80,
+        ])
+        return "\n".join(lines)
+
+    def write_log(self, path: Path | str = Path("artifacts/test_run.log")) -> Path:
+        """Write the formatted test run log to a file.
+
+        Creates any missing parent directories.
+
+        Args:
+            path: Target file path (defaults to artifacts/test_run.log).
+
+        Returns:
+            The Path where the log was written.
+        """
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(self.to_log_text(), encoding="utf-8")
+        return target
 
 
 class GeminiReading(BaseModel):

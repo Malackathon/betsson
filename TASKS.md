@@ -91,9 +91,15 @@ Las demás ramas deben diseñar sus APIs contra estos nombres **asumiendo que ex
    - Helpers de reconciliación que emiten checks S1.09, S1.10, S2.06, S2.07.
    - Detección de palabras clave de idioma: EN (`insufficient`, `funds`, `balance`) / ES (`insuficiente`, `fondos`, `saldo`) — consumirá las listas desde `MarketConfig`.
 4. **`config/settings.py`** — `pydantic-settings` con `BETSSON_{COM|PE}_S{1|2}_{USER|PASS}` y `GEMINI_API_KEY`; método `get_credentials(agent_id)`. Nunca imprimir secretos.
-5. **Tests unitarios TDD** en `tests/unit/` para money (ambos locales de número), checks y schemas. Sin red, sin credenciales. Deben pasar con `pytest tests/unit`.
+5. **Formateo y exportación de logs de tests (`test_run.log`)**:
+   - En `src/models/schemas.py`:
+     - Métodos `to_log_text()` en `SubAgentReport` y `MasterReport` que generan el informe legible en texto plano.
+     - Indicador explícito `[PASSED]` o `[FAILED]` / `[ERROR]` a nivel de agente y global.
+     - Bloque de detalles para cada fallo (`FAIL` o `ERROR`): ID del check, nombre, valores esperados vs observados, explicación detallada del fallo y ruta a la evidencia/captura.
+     - Método `write_log(path: Path | str = "artifacts/test_run.log") -> Path` en `MasterReport` para escribirlo en disco.
+6. **Tests unitarios TDD** en `tests/unit/` para money (ambos locales de número), checks, schemas y generación de logs. Sin red, sin credenciales. Deben pasar con `pytest tests/unit`.
 
-**Definición de hecho:** `pytest tests/unit` en verde, tipado completo, sin floats en lógica de dinero.
+**Definición de hecho:** `pytest tests/unit` en verde, tipado completo, sin floats en lógica de dinero, generación de `test_run.log` testeada con casos exitosos y fallidos.
 
 ---
 
