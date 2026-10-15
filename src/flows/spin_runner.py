@@ -10,7 +10,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from src.network.models import SpinAttempt, SpinAttemptStatus
 from src.network.monitor import DEFAULT_ROUND_TIMEOUT_S, NetworkMonitor
@@ -45,18 +45,32 @@ def run_spin_with_bonus_retry(
     round_timeout_s: float = DEFAULT_ROUND_TIMEOUT_S,
     post_settle_ms: int = DEFAULT_POST_SETTLE_MS,
     max_bonus_retries: int = DEFAULT_MAX_BONUS_RETRIES,
+    max_click_attempts: int = 1,
+    relocate: Callable[[], Any] | None = None,
 ) -> SpinRun:
-    """Spin until a clean (non-bonus) round, a rejection, or the retry budget is spent (R8)."""
+    """Spin until a clean (non-bonus) round, a rejection, or the retry budget is spent (R8).
+
+    A click that produces NO server traffic may have hit an intro/"tap to continue" screen rather
+    than the Spin button. With ``relocate`` (fresh screenshot + button search) the click is tried
+    again, up to ``max_click_attempts`` times. Rejections are never retried.
+    """
     bonus_retries = 0
-    attempts_made = 0
+    spins_made = 0
+    clicks = 0
+    coords = spin_coords
     while True:
-        attempts_made += 1
-        attempt, shot = _single_spin(canvas, monitor, spin_coords, round_timeout_s, post_settle_ms)
+        clicks += 1
+        attempt, shot = _single_spin(canvas, monitor, coords, round_timeout_s, post_settle_ms)
+        if attempt.status is SpinAttemptStatus.NO_TRAFFIC and relocate is not None and clicks < max_click_attempts:
+            logger.info("Click %d produced no spin request; re-locating the Spin button", clicks)
+            coords = relocate()
+            continue
+        spins_made += 1
         bonus = attempt.status is SpinAttemptStatus.SETTLED and attempt.round and attempt.round.bonus_triggered
-        if not bonus or attempts_made >= max_bonus_retries:
+        if not bonus or spins_made >= max_bonus_retries:
             return SpinRun(attempt, shot, bonus_retries)
         bonus_retries += 1
-        logger.info("Bonus/free spins triggered (attempt %d); spinning again (R8)", attempts_made)
+        logger.info("Bonus/free spins triggered (spin %d); spinning again (R8)", spins_made)
 
 
 def _single_spin(

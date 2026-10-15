@@ -101,10 +101,12 @@ def evaluate_scenario_1(runner: CheckRunner, outcome: SpinOutcome, ctx: Scenario
         status=_status(outcome.balance_before > ZERO),
     )
 
-    screen = ScreenVerification(None, {})
     if settled:
         reference = ScreenReference(rnd.balance_after, rnd.bet, rnd.total_win, ctx.currency_symbol, ctx.market)
-        screen = _verify_screen(ctx, outcome.final_screenshot, reference)
+    else:
+        # No server round to ground with: still transcribe the screen (blind) to see what is shown.
+        reference = ScreenReference(None, None, None, ctx.currency_symbol, ctx.market)
+    screen = _verify_screen(ctx, outcome.final_screenshot, reference)
     _screen_checks_s1(runner, screen, settled)
     _spin_lifecycle_checks(runner, attempt, rnd)
     _visual_reaction_check(runner, outcome)

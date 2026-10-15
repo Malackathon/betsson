@@ -99,3 +99,80 @@ def test_server_rejection_is_not_retried(tmp_path):
 
     assert run.attempt.status is SpinAttemptStatus.REJECTED
     assert canvas.clicks == 1
+
+
+# ------------------------------------------------ re-locate and click again when nothing spun
+
+
+class CoordsCanvas(FakeCanvas):
+    """Records the coordinates of each click; only the click at SPIN_AT starts a round."""
+
+    SPIN_AT = {"x": 0.9, "y": 0.7}
+
+    def __init__(self, monitor, tmp):
+        super().__init__(monitor, [], tmp)
+        self.clicked: list = []
+
+    def click_spin(self, coords) -> None:
+        self.clicks += 1
+        self.clicked.append(coords)
+        if coords == self.SPIN_AT:
+            self._monitor.ingest(GATEWAY, "POST", 200, SPIN_REQ, "tw=0.00&balance=99.80&c=0.01&l=20&na=s")
+
+
+def test_first_click_on_an_intro_screen_is_retried_at_the_relocated_button(tmp_path):
+    monitor = _monitor_with_balance()
+    canvas = CoordsCanvas(monitor, tmp_path)
+    relocations = []
+
+    def relocate():
+        relocations.append(1)
+        return CoordsCanvas.SPIN_AT
+
+    run = run_spin_with_bonus_retry(
+        canvas, monitor, {"x": 0.8, "y": 0.65}, round_timeout_s=0.3, post_settle_ms=0,
+        max_click_attempts=3, relocate=relocate,
+    )
+
+    assert run.attempt.status is SpinAttemptStatus.SETTLED
+    assert canvas.clicked == [{"x": 0.8, "y": 0.65}, CoordsCanvas.SPIN_AT]
+    assert len(relocations) == 1
+
+
+def test_without_a_relocator_a_silent_click_is_not_repeated(tmp_path):
+    monitor = _monitor_with_balance()
+    canvas = CoordsCanvas(monitor, tmp_path)
+
+    run = run_spin_with_bonus_retry(
+        canvas, monitor, {"x": 0.1, "y": 0.1}, round_timeout_s=0.3, post_settle_ms=0, max_click_attempts=3
+    )
+
+    assert run.attempt.status is SpinAttemptStatus.NO_TRAFFIC
+    assert canvas.clicks == 1
+
+
+def test_click_attempts_are_bounded(tmp_path):
+    monitor = _monitor_with_balance()
+    canvas = CoordsCanvas(monitor, tmp_path)
+
+    run = run_spin_with_bonus_retry(
+        canvas, monitor, {"x": 0.1, "y": 0.1}, round_timeout_s=0.2, post_settle_ms=0,
+        max_click_attempts=3, relocate=lambda: {"x": 0.2, "y": 0.2},
+    )
+
+    assert run.attempt.status is SpinAttemptStatus.NO_TRAFFIC
+    assert canvas.clicks == 3
+
+
+def test_a_server_rejection_is_never_relocated_or_retried(tmp_path):
+    monitor = _monitor_with_balance("0.05")
+    canvas = FakeCanvas(monitor, ["error=1&msg=Insufficient%20funds&balance=0.05"], tmp_path)
+    relocations = []
+
+    run = run_spin_with_bonus_retry(
+        canvas, monitor, {"x": 0.5, "y": 0.5}, round_timeout_s=0.3, post_settle_ms=0,
+        max_click_attempts=3, relocate=lambda: relocations.append(1) or {"x": 0, "y": 0},
+    )
+
+    assert run.attempt.status is SpinAttemptStatus.REJECTED
+    assert canvas.clicks == 1 and relocations == []

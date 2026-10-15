@@ -24,11 +24,17 @@ logger = logging.getLogger(__name__)
 MIN_SPIN_CONFIDENCE = 0.5
 
 
-def build_spin_provider(inspector: GeminiInspector, market: str) -> Callable[[Path], RelativeCoords]:
-    """Gemini finds the Spin button; a low-confidence answer makes GameFlow use its fallback."""
+def build_spin_provider(
+    inspector: GeminiInspector, market: str, *, use_cache: bool = True
+) -> Callable[[Path], RelativeCoords]:
+    """Gemini finds the Spin button; a low-confidence answer makes GameFlow use its fallback.
+
+    ``use_cache=False`` always asks again: after a click that did nothing, the cached position
+    (found on an intro screen) is the thing that must not be trusted.
+    """
 
     def provider(screenshot: Path) -> RelativeCoords:
-        location = inspector.locate_spin_button(screenshot, market=market)
+        location = inspector.locate_spin_button(screenshot, market=market if use_cache else "")
         if not location.legible or location.confidence < MIN_SPIN_CONFIDENCE:
             raise ValueError(f"Spin button not located with confidence (confidence={location.confidence})")
         return RelativeCoords(x=location.x_pct, y=location.y_pct)
@@ -75,6 +81,6 @@ def run_live_scenario(
         ) as flow:
             flow.prepare()
             if scenario == 1:
-                evaluate_scenario_1(runner, flow.execute_scenario_1(provider), ctx)
+                evaluate_scenario_1(runner, flow.execute_scenario_1(provider, build_spin_provider(inspector, market, use_cache=False)), ctx)
             else:
                 evaluate_scenario_2(runner, flow.execute_scenario_2(provider), ctx)

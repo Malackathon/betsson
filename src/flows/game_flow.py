@@ -93,6 +93,7 @@ class FlowCallbacks:
 
 
 _RETRY_SPIN_ON_BONUS_MAX = 3
+_MAX_CLICK_ATTEMPTS = 3  # an intro/"tap to continue" screen can swallow the first click
 _S2_ROUND_TIMEOUT_S = 6.0  # a rejected spin never settles; do not wait the full round timeout
 _NETWORK_EVIDENCE_REL = Path("network") / "game_transactions.json"
 _VIDEO_DIR_NAME = "video"
@@ -153,6 +154,7 @@ class GameFlow:
     def execute_scenario_1(
         self,
         spin_coords_provider: Callable[[Path], RelativeCoords] | None = None,
+        retry_coords_provider: Callable[[Path], RelativeCoords] | None = None,
     ) -> SpinOutcome:
         """Execute Scenario 1: Real Play spin + balance reconciliation.
 
@@ -173,7 +175,12 @@ class GameFlow:
         if self._callbacks.on_spin_start:
             self._callbacks.on_spin_start()
         run = run_spin_with_bonus_retry(
-            self._canvas, self._monitor, spin_coords, max_bonus_retries=_RETRY_SPIN_ON_BONUS_MAX
+            self._canvas,
+            self._monitor,
+            spin_coords,
+            max_bonus_retries=_RETRY_SPIN_ON_BONUS_MAX,
+            max_click_attempts=_MAX_CLICK_ATTEMPTS if retry_coords_provider else 1,
+            relocate=lambda: self._relocate_spin(retry_coords_provider),
         )
         self._apply_spin_run(outcome, run)
         outcome.status = self._status_for_scenario_1(run)
@@ -267,6 +274,12 @@ class GameFlow:
             tab.close()
             if self._canvas is not None:
                 self._canvas.page.bring_to_front()
+
+    def _relocate_spin(self, provider: Callable[[Path], RelativeCoords] | None) -> RelativeCoords:
+        """Fresh screenshot + a new (uncached) search for the Spin button."""
+        assert self._canvas is not None
+        shot = self._canvas.take_game_screenshot("spin_relocate")
+        return self._get_spin_coords(shot, provider)
 
     def _apply_spin_run(self, outcome: SpinOutcome, run: SpinRun) -> None:
         """Copy the server-side truth of a spin run into the outcome."""

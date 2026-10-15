@@ -141,7 +141,7 @@ def test_scenario_1_winning_spin_reconciles_with_payout(tmp_path):
     assert _status(runner)["S1.10"] is CheckStatus.PASS
 
 
-def test_scenario_1_with_no_server_round_fails_without_calling_gemini(tmp_path):
+def test_scenario_1_with_no_server_round_fails_the_spin_checks(tmp_path):
     attempt = SpinAttempt(SpinAttemptStatus.NO_TRAFFIC)
     outcome = _s1_outcome(tmp_path, network_round=None, spin_attempt=attempt, status=SpinStatus.ERROR)
     inspector = FakeInspector(GOOD_S1_READING)
@@ -153,7 +153,7 @@ def test_scenario_1_with_no_server_round_fails_without_calling_gemini(tmp_path):
     assert statuses["S1.05"] is CheckStatus.FAIL
     assert statuses["S1.09"] is CheckStatus.FAIL
     assert statuses["S1.10"] is CheckStatus.FAIL
-    assert inspector.calls == []
+    assert len(inspector.calls) == 1  # one blind read of the screen, nothing to ground it with
 
 
 def test_scenario_1_bonus_left_over_is_informative_and_skips_reconciliation(tmp_path):
@@ -345,3 +345,22 @@ def test_a_real_zero_balance_account_still_passes_when_the_server_reported_it(tm
 
     assert _status(runner)["S2.06"] is CheckStatus.PASS
     assert _status(runner)["S2.01"] is CheckStatus.PASS
+
+
+def test_scenario_1_still_reads_the_screen_when_no_round_settled_to_show_what_is_there(tmp_path):
+    """Without a round there is no server reference, but the screen is still transcribed (blind)."""
+    attempt = SpinAttempt(SpinAttemptStatus.NO_TRAFFIC)
+    outcome = _s1_outcome(tmp_path, network_round=None, spin_attempt=attempt, status=SpinStatus.ERROR)
+    inspector = FakeInspector(GOOD_S1_READING)
+    runner = CheckRunner()
+
+    evaluate_scenario_1(runner, outcome, _ctx(inspector))
+
+    assert len(inspector.calls) == 1
+    _, block = inspector.calls[0]
+    assert "Server balance" not in block and "Server bet" not in block  # nothing to ground with
+    statuses = _status(runner)
+    assert statuses["S1.02"] is CheckStatus.PASS   # the HUD is visible even though no spin happened
+    assert statuses["S1.03"] is CheckStatus.PASS   # currency readable on screen
+    assert statuses["S1.05"] is CheckStatus.FAIL   # but the spin itself did not happen
+    assert statuses["S1.09"] is CheckStatus.FAIL
