@@ -5,7 +5,7 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-artifacts/*
+
 !artifacts/.gitkeep
 auth_state/*
 !auth_state/.gitkeep
