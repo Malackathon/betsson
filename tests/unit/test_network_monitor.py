@@ -200,3 +200,42 @@ def test_evidence_json_redacts_tokens_and_has_no_headers(tmp_path):
     data = json.loads(text)
     assert data[1]["request"]["mgckey"] == "<redacted>"
     assert data[1]["response"]["balance"] == "99.80"
+
+
+def test_traffic_overview_lists_every_xhr_with_host_and_path_but_no_query():
+    page, mon = _FakePage(), _monitor()
+    mon.attach(page)
+    page.handlers["response"](
+        _FakeResponse("https://games.example/gs2c/v3/other?token=SECRET", "x", _FakeRequest("xhr", "POST"))
+    )
+    page.handlers["response"](_FakeResponse("https://cdn.example/sprite.png", "x", _FakeRequest("image", "GET")))
+
+    overview = mon.traffic_overview()
+
+    assert any("games.example/gs2c/v3/other" in line and "POST 200" in line for line in overview)
+    assert not any("sprite.png" in line for line in overview)
+    assert not any("SECRET" in line for line in overview)
+
+
+def test_traffic_overview_collapses_repeats_with_a_count():
+    page, mon = _FakePage(), _monitor()
+    mon.attach(page)
+    for _ in range(3):
+        page.handlers["response"](_FakeResponse("https://a.example/api/ping", "x", _FakeRequest("fetch", "GET")))
+
+    assert mon.traffic_overview() == ["GET 200 a.example/api/ping x3"]
+
+
+def test_websocket_connections_appear_in_the_overview():
+    class WS:
+        url = "wss://game.example/socket?sid=SECRET"
+
+        def on(self, *a):
+            pass
+
+    page, mon = _FakePage(), _monitor()
+    mon.attach(page)
+    page.handlers["websocket"](WS())
+
+    overview = mon.traffic_overview()
+    assert overview == ["WS - game.example/socket"]

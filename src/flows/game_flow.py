@@ -186,6 +186,12 @@ class GameFlow:
             relocate=lambda: self._relocate_spin(retry_coords_provider),
         )
         self._remember_spin(run.coords, run.attempt, allow_invalidate=True)
+        if run.attempt.status is SpinAttemptStatus.NO_TRAFFIC:
+            logger.warning(
+                "[%s] No spin request recognised. The game's recent requests were: %s",
+                self._agent_id,
+                self._monitor.traffic_overview(),
+            )
         self._apply_spin_run(outcome, run)
         outcome.status = self._status_for_scenario_1(run)
 

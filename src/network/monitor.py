@@ -12,8 +12,10 @@ import json
 import logging
 import threading
 import time
+from collections import Counter, deque
 from decimal import Decimal
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import Any
 
 from src.core.money import reconcile
@@ -37,6 +39,7 @@ BALANCE_KINDS = frozenset({TxKind.INIT, TxKind.SPIN, TxKind.COLLECT, TxKind.BONU
 POLL_INTERVAL_MS = 100
 DEFAULT_ROUND_TIMEOUT_S = 25.0
 WS_METHOD = "WS"
+TRAFFIC_LIMIT = 300
 
 
 class NetworkMonitor:
@@ -53,6 +56,7 @@ class NetworkMonitor:
         self._pending: list[tuple[Any, str, str, int | None, str | None]] = []
         self._lock = threading.Lock()
         self._page: Any = None
+        self._traffic: deque[str] = deque(maxlen=TRAFFIC_LIMIT)
 
     # ------------------------------------------------------------------ attach
 
@@ -79,6 +83,7 @@ class NetworkMonitor:
             request = response.request
             if request.resource_type not in LISTENED_RESOURCE_TYPES:
                 return
+            self._note_traffic(request.method, str(response.status), response.url)
             post_data = _safe_post_data(request)
             if not self._is_relevant(response.url, post_data):
                 return
@@ -89,6 +94,7 @@ class NetworkMonitor:
 
     def _on_websocket(self, websocket: Any) -> None:
         url = websocket.url
+        self._note_traffic(WS_METHOD, "-", url)
         websocket.on("framereceived", lambda payload: self._on_ws_frame(url, payload))
 
     def _on_ws_frame(self, url: str, payload: str | bytes) -> None:
@@ -98,6 +104,22 @@ class NetworkMonitor:
             except UnicodeDecodeError:
                 return
         self.ingest(url=url, method=WS_METHOD, http_status=None, request_body=None, response_body=payload)
+
+    def _note_traffic(self, method: str, status: str, url: str) -> None:
+        parts = urlsplit(url)
+        with self._lock:
+            self._traffic.append(f"{method} {status} {parts.netloc}{parts.path}")
+
+    def traffic_overview(self, limit: int = 30) -> list[str]:
+        """Recent XHR/fetch/WebSocket requests as ``METHOD STATUS host/path [xN]`` (no query strings).
+
+        Shows what the game really talks to when no spin request was recognised.
+        """
+        with self._lock:
+            counts = Counter(self._traffic)
+            ordered = list(dict.fromkeys(self._traffic))
+        lines = [f"{line} x{counts[line]}" if counts[line] > 1 else line for line in ordered]
+        return lines[-limit:]
 
     def _drain(self) -> None:
         """Read the bodies of filtered responses (runs on the caller's thread)."""
@@ -261,6 +283,9 @@ class NetworkMonitor:
             for tx in self.transactions
         ]
         target.write_text(json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
+        (target.parent / "traffic_overview.json").write_text(
+            json.dumps(self.traffic_overview(limit=TRAFFIC_LIMIT), indent=2), encoding="utf-8"
+        )
         return target
 
 
