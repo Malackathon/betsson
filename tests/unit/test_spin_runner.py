@@ -176,3 +176,15 @@ def test_a_server_rejection_is_never_relocated_or_retried(tmp_path):
 
     assert run.attempt.status is SpinAttemptStatus.REJECTED
     assert canvas.clicks == 1 and relocations == []
+
+
+def test_spin_run_reports_the_coordinates_that_finally_worked(tmp_path):
+    monitor = _monitor_with_balance()
+    canvas = CoordsCanvas(monitor, tmp_path)
+
+    run = run_spin_with_bonus_retry(
+        canvas, monitor, {"x": 0.8, "y": 0.65}, round_timeout_s=0.3, post_settle_ms=0,
+        max_click_attempts=3, relocate=lambda: CoordsCanvas.SPIN_AT,
+    )
+
+    assert run.coords == CoordsCanvas.SPIN_AT

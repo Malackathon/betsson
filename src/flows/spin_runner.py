@@ -35,6 +35,7 @@ class SpinRun:
     attempt: SpinAttempt
     final_screenshot: Path | None
     bonus_retries: int
+    coords: Any = None  # where the click that produced this attempt landed (relative 0..1)
 
 
 def run_spin_with_bonus_retry(
@@ -68,7 +69,7 @@ def run_spin_with_bonus_retry(
         spins_made += 1
         bonus = attempt.status is SpinAttemptStatus.SETTLED and attempt.round and attempt.round.bonus_triggered
         if not bonus or spins_made >= max_bonus_retries:
-            return SpinRun(attempt, shot, bonus_retries)
+            return SpinRun(attempt, shot, bonus_retries, coords)
         bonus_retries += 1
         logger.info("Bonus/free spins triggered (spin %d); spinning again (R8)", spins_made)
 

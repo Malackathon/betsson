@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 from playwright.sync_api import Browser, BrowserContext, Page, Playwright
 
@@ -34,6 +34,7 @@ from src.browser.session_watch import SessionWatch
 from src.browser.session_state import apply_session_storage, expired_login_cookies, find_reusable_session
 from src.flows.spin_runner import SpinRun, run_spin_with_bonus_retry
 from src.network.models import RoundResult, SpinAttempt, SpinAttemptStatus
+from src.vision.spin_store import SpinLocationStore, spin_key
 from src.network.monitor import NetworkMonitor
 
 logger = logging.getLogger(__name__)
@@ -114,9 +115,11 @@ class GameFlow:
         headless: bool = True,
         callbacks: FlowCallbacks | None = None,
         monitor: NetworkMonitor | None = None,
+        spin_store: SpinLocationStore | None = None,
     ) -> None:
         self._monitor = monitor or NetworkMonitor()
         self._watch = SessionWatch()
+        self._spin_store = spin_store or SpinLocationStore()
         self._pw = playwright
         self._market = market
         self._agent_id = agent_id
@@ -170,7 +173,7 @@ class GameFlow:
 
         pre_screenshot = self._canvas.take_game_screenshot("s1_pre_spin")
         outcome.screenshots.append(pre_screenshot)
-        spin_coords = self._get_spin_coords(pre_screenshot, spin_coords_provider)
+        spin_coords = self._stored_spin_coords() or self._get_spin_coords(pre_screenshot, spin_coords_provider)
 
         if self._callbacks.on_spin_start:
             self._callbacks.on_spin_start()
@@ -182,6 +185,7 @@ class GameFlow:
             max_click_attempts=_MAX_CLICK_ATTEMPTS if retry_coords_provider else 1,
             relocate=lambda: self._relocate_spin(retry_coords_provider),
         )
+        self._remember_spin(run.coords, run.attempt, allow_invalidate=True)
         self._apply_spin_run(outcome, run)
         outcome.status = self._status_for_scenario_1(run)
 
@@ -217,7 +221,7 @@ class GameFlow:
                 self._callbacks.on_insufficient_funds(msg, location)
         else:
             # Trigger by clicking spin; the monitor tells us whether the server accepted it.
-            spin_coords = self._get_spin_coords(pre_screenshot, spin_coords_provider)
+            spin_coords = self._stored_spin_coords() or self._get_spin_coords(pre_screenshot, spin_coords_provider)
             run = run_spin_with_bonus_retry(
                 self._canvas,
                 self._monitor,
@@ -225,6 +229,7 @@ class GameFlow:
                 round_timeout_s=_S2_ROUND_TIMEOUT_S,
                 max_bonus_retries=1,
             )
+            self._remember_spin(run.coords, run.attempt, allow_invalidate=False)
             self._apply_spin_run(outcome, run)
             if run.attempt.status is SpinAttemptStatus.SETTLED:
                 outcome.status = SpinStatus.COMPLETED  # a PAID spin went through: unexpected here
@@ -274,6 +279,32 @@ class GameFlow:
             tab.close()
             if self._canvas is not None:
                 self._canvas.page.bring_to_front()
+
+    def _stored_spin_key(self) -> str | None:
+        if self._canvas is None or not self._game_name:
+            return None
+        rect = self._canvas.iframe_rect
+        return spin_key(self._market, self._game_name, rect.width, rect.height)
+
+    def _stored_spin_coords(self) -> RelativeCoords | None:
+        """A Spin location verified in an earlier run for this market/game/layout (skips the AI call)."""
+        key = self._stored_spin_key()
+        location = self._spin_store.get(key) if key else None
+        if location is None:
+            return None
+        logger.info("[%s] Using the stored, previously verified Spin location (no AI call)", self._agent_id)
+        return RelativeCoords(x=location["x"], y=location["y"])
+
+    def _remember_spin(self, coords: Any, attempt: SpinAttempt, *, allow_invalidate: bool) -> None:
+        """Store a location only after it produced spin traffic; forget a stored one that went silent."""
+        key = self._stored_spin_key()
+        if key is None or coords is None:
+            return
+        if attempt.status is not SpinAttemptStatus.NO_TRAFFIC:
+            self._spin_store.save(key, {"x": coords["x"], "y": coords["y"]})
+        elif allow_invalidate:
+            # Silence in scenario 1 means the location is wrong. In scenario 2 it is ambiguous.
+            self._spin_store.invalidate(key)
 
     def _relocate_spin(self, provider: Callable[[Path], RelativeCoords] | None) -> RelativeCoords:
         """Fresh screenshot + a new (uncached) search for the Spin button."""
