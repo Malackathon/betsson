@@ -1,0 +1,370 @@
+"""High-level game flow orchestration for a single sub-agent.
+
+Ties together LobbyPage and GameCanvas:
+1. Context A (no video): Login -> save auth state (R1).
+2. Context B (with video): Load auth state -> open game -> perform scenario.
+3. Stabilized balance readings before/after.
+4. Insufficient-funds warning detection at three locations (R11).
+Money always in Decimal.
+"""
+from __future__ import annotations
+
+import logging
+import time
+from dataclasses import dataclass, field
+from decimal import Decimal
+from enum import Enum
+from pathlib import Path
+from typing import Callable, Protocol, runtime_checkable
+
+from playwright.sync_api import Browser, BrowserContext, Playwright
+
+from src.browser.game_canvas import (
+    CHROMIUM_GPU_ARGS,
+    DEFAULT_VIEWPORT,
+    GameCanvas,
+    RelativeCoords,
+)
+from src.browser.lobby_page import LobbyPage
+from src.browser.selectors import get_market_selectors
+
+logger = logging.getLogger(__name__)
+
+
+class SpinStatus(Enum):
+    """Outcome of attempting a spin."""
+    COMPLETED = "completed"
+    INSUFFICIENT_FUNDS = "insufficient_funds"
+    BONUS_TRIGGERED = "bonus_triggered"
+    ERROR = "error"
+
+
+class InsufficientFundsLocation(Enum):
+    """Where the insufficient-funds warning was detected (R11)."""
+    AT_GAME_OPEN = "at_game_open"
+    IN_WRAPPER_OVERLAY = "in_wrapper_overlay"
+    AFTER_SPIN_CLICK = "after_spin_click"
+    NOT_DETECTED = "not_detected"
+
+
+@dataclass
+class SpinOutcome:
+    """Result of a spin attempt, consumed by the e2e branch."""
+    status: SpinStatus
+    balance_before: Decimal = Decimal("0")
+    balance_after: Decimal = Decimal("0")
+    bet_amount: Decimal = Decimal("0")
+    win_amount: Decimal = Decimal("0")
+    hud_credit_before: Decimal = Decimal("0")
+    hud_credit_after: Decimal = Decimal("0")
+    currency_observed: str = ""
+    insufficient_msg: str = ""
+    insufficient_location: InsufficientFundsLocation = InsufficientFundsLocation.NOT_DETECTED
+    screenshots: list[Path] = field(default_factory=list)
+    video_path: Path | None = None
+
+
+@dataclass
+class FlowCallbacks:
+    """Optional callbacks for e2e hooks."""
+    on_login_complete: Callable[[], None] | None = None
+    on_game_opened: Callable[[str], None] | None = None
+    on_balance_read: Callable[[Decimal], None] | None = None
+    on_spin_start: Callable[[], None] | None = None
+    on_spin_end: Callable[[SpinOutcome], None] | None = None
+    on_insufficient_funds: Callable[[str, InsufficientFundsLocation], None] | None = None
+
+
+_POST_SPIN_SETTLE_MS = 3000
+_RETRY_SPIN_ON_BONUS_MAX = 3
+_VIDEO_DIR_NAME = "video"
+_AUTH_STATE_DIR_NAME = "auth_state"
+
+
+class GameFlow:
+    """Orchestrates the full flow of a single sub-agent's test scenario."""
+
+    def __init__(
+        self,
+        playwright: Playwright,
+        market: str = "com",
+        agent_id: str = "agent_com_s1",
+        username: str = "",
+        password: str = "",
+        artifacts_dir: Path | None = None,
+        headless: bool = True,
+        callbacks: FlowCallbacks | None = None,
+    ) -> None:
+        self._pw = playwright
+        self._market = market
+        self._agent_id = agent_id
+        self._username = username
+        self._password = password
+        self._artifacts_dir = artifacts_dir or Path(f"artifacts/{agent_id}")
+        self._headless = headless
+        self._callbacks = callbacks or FlowCallbacks()
+        self._mkt_config = get_market_selectors(market)
+
+        self._browser: Browser | None = None
+        self._ctx_login: BrowserContext | None = None
+        self._ctx_game: BrowserContext | None = None
+        self._lobby: LobbyPage | None = None
+        self._canvas: GameCanvas | None = None
+        self._game_name: str = ""
+        self._auth_state_path: Path | None = None
+
+    def prepare(self) -> tuple[LobbyPage, GameCanvas]:
+        """Phase 1: Login without recording + open game with video recording."""
+        self._launch_browser()
+        self._login_phase()
+        self._game_phase()
+        assert self._lobby is not None
+        assert self._canvas is not None
+        return self._lobby, self._canvas
+
+    def execute_scenario_1(
+        self,
+        spin_coords_provider: Callable[[Path], RelativeCoords] | None = None,
+    ) -> SpinOutcome:
+        """Execute Scenario 1: Real Play spin + balance reconciliation."""
+        assert self._lobby is not None and self._canvas is not None
+        outcome = SpinOutcome(status=SpinStatus.COMPLETED)
+
+        outcome.balance_before = self._lobby.read_balance_stable()
+        if self._callbacks.on_balance_read:
+            self._callbacks.on_balance_read(outcome.balance_before)
+
+        pre_screenshot = self._canvas.take_game_screenshot("s1_pre_spin")
+        outcome.screenshots.append(pre_screenshot)
+        spin_coords = self._get_spin_coords(pre_screenshot, spin_coords_provider)
+
+        retries = 0
+        while retries < _RETRY_SPIN_ON_BONUS_MAX:
+            if self._callbacks.on_spin_start:
+                self._callbacks.on_spin_start()
+
+            self._canvas.click_spin(spin_coords)
+            self._canvas.page.wait_for_timeout(_POST_SPIN_SETTLE_MS)
+
+            post_screenshot = self._canvas.take_game_screenshot("s1_post_spin")
+            outcome.screenshots.append(post_screenshot)
+            outcome.status = SpinStatus.COMPLETED
+            break
+
+        outcome.balance_after = self._lobby.read_balance_stable()
+        outcome.currency_observed = self._lobby.read_currency_from_header()
+        if self._callbacks.on_spin_end:
+            self._callbacks.on_spin_end(outcome)
+        outcome.video_path = self._get_video_path()
+        return outcome
+
+    def execute_scenario_2(
+        self,
+        spin_coords_provider: Callable[[Path], RelativeCoords] | None = None,
+    ) -> SpinOutcome:
+        """Execute Scenario 2: Insufficient funds check across 3 locations (R11)."""
+        assert self._lobby is not None and self._canvas is not None
+        outcome = SpinOutcome(status=SpinStatus.INSUFFICIENT_FUNDS)
+
+        outcome.balance_before = self._lobby.read_balance_stable()
+        if self._callbacks.on_balance_read:
+            self._callbacks.on_balance_read(outcome.balance_before)
+
+        pre_screenshot = self._canvas.take_game_screenshot("s2_pre_action")
+        outcome.screenshots.append(pre_screenshot)
+
+        # Location 1: at game open
+        msg, location = self._check_insufficient_funds_at_open()
+        if msg:
+            outcome.insufficient_msg, outcome.insufficient_location = msg, location
+            if self._callbacks.on_insufficient_funds:
+                self._callbacks.on_insufficient_funds(msg, location)
+        else:
+            # Trigger by clicking spin
+            spin_coords = self._get_spin_coords(pre_screenshot, spin_coords_provider)
+            self._canvas.click_spin(spin_coords)
+            self._canvas.page.wait_for_timeout(2000)
+
+            post_screenshot = self._canvas.take_game_screenshot("s2_post_click")
+            outcome.screenshots.append(post_screenshot)
+
+            # Location 2 & 3: wrapper or after click
+            msg, location = self._check_insufficient_funds_wrapper()
+            if not msg:
+                msg, location = self._check_insufficient_funds_after_click()
+            outcome.insufficient_msg, outcome.insufficient_location = msg, location
+
+            if msg and self._callbacks.on_insufficient_funds:
+                self._callbacks.on_insufficient_funds(msg, location)
+
+        outcome.balance_after = self._lobby.read_balance_stable()
+        outcome.currency_observed = self._lobby.read_currency_from_header()
+        final_screenshot = self._canvas.take_game_screenshot("s2_final")
+        outcome.screenshots.append(final_screenshot)
+
+        if self._callbacks.on_spin_end:
+            self._callbacks.on_spin_end(outcome)
+        outcome.video_path = self._get_video_path()
+        return outcome
+
+    def _launch_browser(self) -> None:
+        """Launch Chromium with WebGL fallback arguments (R14)."""
+        launch_args = list(CHROMIUM_GPU_ARGS)
+        if self._headless:
+            launch_args.append("--headless=new")
+        self._browser = self._pw.chromium.launch(headless=self._headless, args=launch_args)
+        logger.info("[%s] Browser launched (headless=%s)", self._agent_id, self._headless)
+
+    def _login_phase(self) -> None:
+        """Context A: login without video recording to protect secrets (R1)."""
+        assert self._browser is not None
+        auth_dir = self._artifacts_dir.parent / _AUTH_STATE_DIR_NAME
+        auth_dir.mkdir(parents=True, exist_ok=True)
+
+        self._ctx_login = self._browser.new_context(
+            viewport=DEFAULT_VIEWPORT,
+            locale=self._mkt_config.locale,
+        )
+        page = self._ctx_login.new_page()
+        lobby = LobbyPage(page=page, market=self._market, agent_id=self._agent_id, auth_state_dir=auth_dir)
+        lobby.login(self._username, self._password)
+
+        if self._callbacks.on_login_complete:
+            self._callbacks.on_login_complete()
+
+        self._auth_state_path = lobby.get_auth_state_path()
+        self._ctx_login.close()
+        self._ctx_login = None
+        logger.info("[%s] Login context closed, auth state saved", self._agent_id)
+
+    def _game_phase(self) -> None:
+        """Context B: load auth state and record video for game session."""
+        assert self._browser is not None
+        video_dir = self._artifacts_dir / _VIDEO_DIR_NAME
+        video_dir.mkdir(parents=True, exist_ok=True)
+
+        self._ctx_game = self._browser.new_context(
+            viewport=DEFAULT_VIEWPORT,
+            locale=self._mkt_config.locale,
+            storage_state=str(self._auth_state_path),
+            record_video_dir=str(video_dir),
+            record_video_size=DEFAULT_VIEWPORT,
+        )
+        page = self._ctx_game.new_page()
+        auth_dir = self._artifacts_dir.parent / _AUTH_STATE_DIR_NAME
+        self._lobby = LobbyPage(page=page, market=self._market, agent_id=self._agent_id, auth_state_dir=auth_dir)
+
+        self._lobby.navigate_to_casino()
+        self._game_name = self._lobby.search_and_open_game()
+        if self._callbacks.on_game_opened:
+            self._callbacks.on_game_opened(self._game_name)
+
+        self._canvas = GameCanvas(
+            page=page,
+            market=self._market,
+            agent_id=self._agent_id,
+            artifacts_dir=self._artifacts_dir,
+        )
+        self._canvas.locate_iframe()
+        self._canvas.dismiss_intros()
+        self._lobby.dismiss_game_wrappers()
+        logger.info("[%s] Game '%s' ready", self._agent_id, self._game_name)
+
+    def _get_spin_coords(
+        self,
+        screenshot_path: Path,
+        provider: Callable[[Path], RelativeCoords] | None,
+    ) -> RelativeCoords:
+        """Resolve spin button coordinates from vision provider or fallback."""
+        if provider is not None:
+            try:
+                coords = provider(screenshot_path)
+                logger.info("[%s] Spin coords from provider: (%.3f, %.3f)", self._agent_id, coords["x"], coords["y"])
+                return coords
+            except Exception as exc:
+                logger.warning("[%s] Spin provider failed (%s), using fallback", self._agent_id, exc)
+
+        fallback = RelativeCoords(x=0.5, y=0.92)
+        logger.info("[%s] Using fallback Spin coords: (0.5, 0.92)", self._agent_id)
+        return fallback
+
+    def _check_insufficient_funds_at_open(self) -> tuple[str, InsufficientFundsLocation]:
+        return self._scan_for_insufficient_message(InsufficientFundsLocation.AT_GAME_OPEN)
+
+    def _check_insufficient_funds_wrapper(self) -> tuple[str, InsufficientFundsLocation]:
+        return self._scan_for_insufficient_message(InsufficientFundsLocation.IN_WRAPPER_OVERLAY)
+
+    def _check_insufficient_funds_after_click(self) -> tuple[str, InsufficientFundsLocation]:
+        return self._scan_for_insufficient_message(InsufficientFundsLocation.AFTER_SPIN_CLICK)
+
+    def _scan_for_insufficient_message(
+        self,
+        location: InsufficientFundsLocation,
+    ) -> tuple[str, InsufficientFundsLocation]:
+        """Scan DOM wrapper containers for insufficient-funds keywords."""
+        assert self._canvas is not None
+        keywords = self._mkt_config.keywords_insufficient
+        try:
+            page = self._canvas.page
+            modal_selectors = [
+                ".modal-body",
+                ".alert-message",
+                "[role='alert']",
+                "[role='dialog']",
+                ".notification-message",
+                ".error-message",
+                ".game-message",
+                ".insufficient-funds",
+            ]
+            for sel in modal_selectors:
+                loc = page.locator(sel)
+                count = loc.count()
+                for i in range(min(count, 5)):
+                    try:
+                        text = loc.nth(i).inner_text(timeout=1000)
+                        if any(kw.lower() in text.lower() for kw in keywords):
+                            logger.info("[%s] Insufficient funds at %s: %r", self._agent_id, location.value, text)
+                            return text.strip(), location
+                    except Exception:
+                        continue
+        except Exception as exc:
+            logger.debug("[%s] Error scanning insufficient msg: %s", self._agent_id, exc)
+
+        return "", InsufficientFundsLocation.NOT_DETECTED
+
+    def _get_video_path(self) -> Path | None:
+        """Retrieve video path from recording context."""
+        if self._ctx_game is None:
+            return None
+        try:
+            pages = self._ctx_game.pages
+            if pages and pages[0].video:
+                path = pages[0].video.path()
+                return Path(path) if path else None
+        except Exception:
+            pass
+        return None
+
+    def close(self) -> None:
+        """Close browser contexts and browser."""
+        for ctx in (self._ctx_game, self._ctx_login):
+            if ctx is not None:
+                try:
+                    ctx.close()
+                except Exception:
+                    pass
+        self._ctx_game = None
+        self._ctx_login = None
+        if self._browser is not None:
+            try:
+                self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+        logger.info("[%s] GameFlow closed", self._agent_id)
+
+    def __enter__(self) -> GameFlow:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
