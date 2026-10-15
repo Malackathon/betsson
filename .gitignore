@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+artifacts/*
+!artifacts/.gitkeep
+auth_state/*
+!auth_state/.gitkeep
+*.webm
+trace*.zip
+report.html
