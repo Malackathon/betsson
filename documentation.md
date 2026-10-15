@@ -99,9 +99,32 @@ El login automático lo bloquea el antifraude de Betsson, así que se reutiliza 
 | **Scenario 1 – giro real** | `py -m pytest tests/test_scenario_1_spin.py -k "com_s1" -s` | Ejecuta un spin que consume saldo. |
 | **Todos los agentes en paralelo** | `py -m pytest -m e2e -n 4 -s` | Lanza los 4 sub‑agentes simultáneamente. |
 ### 5️⃣ Encontrar los resultados
-- **JSON de resultados:** `artifacts/result_<agent_id>.json` 
-- **Reporte HTML:** `artifacts/report.html` (abre en cualquier navegador). |
 
+**Ejecución real** (se generan en `artifacts/`, que git ignora):
+
+| Qué | Dónde |
+|-----|-------|
+| Reporte HTML (tabla de checks, abrir en cualquier navegador) | `artifacts/report.html` |
+| Resumen en Markdown | `artifacts/report.md` |
+| Resultado consolidado de los 4 agentes | `artifacts/master_report.json` |
+| Resultado de un agente | `artifacts/<agent_id>/result_<agent_id>.json` |
+| Capturas de evidencia | `artifacts/<agent_id>/evidence/` |
+| Vídeo de la sesión | `artifacts/<agent_id>/video/` |
+| Tráfico de red del juego (sin cookies ni tokens) | `artifacts/<agent_id>/network/game_transactions.json` |
+
+**Reporte de ejemplo (SIMULADO, datos ficticios)** — está versionado en el repositorio para ver cómo se ve un informe con aciertos y un fallo detectado:
+
+| Qué | Dónde |
+|-----|-------|
+| Reporte HTML de ejemplo | [`docs/demo_report_SIMULADO/report.html`](docs/demo_report_SIMULADO/report.html) |
+| Resumen en Markdown | [`docs/demo_report_SIMULADO/report.md`](docs/demo_report_SIMULADO/report.md) |
+| Log con el diagnóstico del fallo | [`docs/demo_report_SIMULADO/test_run.log`](docs/demo_report_SIMULADO/test_run.log) |
+
+> ⚠️ Es una **simulación**: los datos son ficticios (no son resultados reales de Betsson). Lo real es la lógica de comprobación (S1.xx / S2.xx). En el ejemplo, `agent_pe_s1` falla en S1.09 y S1.10 a propósito, para demostrar que el sistema detecta errores. Para regenerarlo:
+>
+> ```bash
+> python scripts/simulate_report.py docs/demo_report_SIMULADO
+> ```
 
 ## 📦 Artefactos generados por cada ejecución
 ```
@@ -110,7 +133,9 @@ artifacts/
 ├─ report.md                 # resumen markdown del reporte
 ├─ agent_com_s1/
 │   ├─ result_agent_com_s1.json
-│   └─ screenshots/ …
+│   ├─ evidence/ …
+│   ├─ video/ …
+│   └─ network/ …
 ├─ agent_pe_s2/ …
 └─ … (otros agentes)
 ```
