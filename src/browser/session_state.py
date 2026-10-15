@@ -53,3 +53,21 @@ def apply_session_storage(context, auth_state_path: Path) -> bool:
         return False
     context.add_init_script(build_session_storage_script(web))
     return True
+
+
+LOGIN_COOKIE_HINT = "auth"
+
+
+def expired_login_cookies(auth_state_path: Path, now: float | None = None) -> list[tuple[str, int]]:
+    """Login-looking cookies (name contains 'auth') whose expiry date has passed: (name, minutes ago)."""
+    try:
+        cookies = json.loads(Path(auth_state_path).read_text(encoding="utf-8")).get("cookies", [])
+    except (OSError, ValueError):
+        return []
+    moment = time.time() if now is None else now
+    expired = []
+    for cookie in cookies:
+        expires = cookie.get("expires", -1)
+        if LOGIN_COOKIE_HINT in str(cookie.get("name", "")).lower() and expires and expires > 0 and expires < moment:
+            expired.append((cookie["name"], int((moment - expires) // 60)))
+    return expired

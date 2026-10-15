@@ -31,7 +31,7 @@ from src.browser.selectors import get_market_selectors
 from src.browser.visual_debug import CURSOR_SCRIPT, read_visual_settings
 from src.browser.iframe_finder import page_snapshot
 from src.browser.session_watch import SessionWatch
-from src.browser.session_state import apply_session_storage, find_reusable_session
+from src.browser.session_state import apply_session_storage, expired_login_cookies, find_reusable_session
 from src.flows.spin_runner import SpinRun, run_spin_with_bonus_retry
 from src.network.models import RoundResult, SpinAttempt, SpinAttemptStatus
 from src.network.monitor import NetworkMonitor
@@ -326,6 +326,15 @@ class GameFlow:
         if reusable is not None:
             # A human logged in with scripts/save_session.py: skip the automated login, which
             # the site's antifraud rejects. The session is verified once the game page loads.
+            stale = expired_login_cookies(reusable)
+            if stale:
+                names = ", ".join(f"{name} (expired {minutes} min ago)" for name, minutes in stale)
+                raise RuntimeError(
+                    f"[{self._agent_id}] The saved session is expired: {names}. Login cookies last about an "
+                    "hour. Export fresh cookies.json/storage.json while logged in and run: "
+                    f"python scripts/import_cookies.py {self._agent_id} cookies.json storage.json "
+                    f"(check with: python scripts/check_session.py {self._agent_id})"
+                )
             self._auth_state_path = reusable
             self._reused_session = True
             logger.info("[%s] Reusing saved session %s (automated login skipped)", self._agent_id, reusable.name)
