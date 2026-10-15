@@ -28,6 +28,7 @@ from src.browser.game_canvas import (
 )
 from src.browser.lobby_page import LobbyPage
 from src.browser.selectors import get_market_selectors
+from src.browser.visual_debug import CURSOR_SCRIPT, read_visual_settings
 from src.browser.session_state import apply_session_storage, find_reusable_session
 from src.flows.spin_runner import SpinRun, run_spin_with_bonus_retry
 from src.network.models import RoundResult, SpinAttempt, SpinAttemptStatus
@@ -128,6 +129,7 @@ class GameFlow:
         self._game_name: str = ""
         self._auth_state_path: Path | None = None
         self._reused_session = False
+        self._visual = read_visual_settings(os.environ, headless)
 
     @property
     def monitor(self) -> NetworkMonitor:
@@ -280,15 +282,16 @@ class GameFlow:
         browser_type = os.getenv("PLAYWRIGHT_BROWSER") or os.getenv("BROWSER_TYPE") or "chromium"
         b_type = browser_type.strip().lower()
 
+        slow_mo = self._visual.slow_mo_ms
         if b_type == "firefox":
-            self._browser = self._pw.firefox.launch(headless=self._headless)
+            self._browser = self._pw.firefox.launch(headless=self._headless, slow_mo=slow_mo)
         elif b_type == "webkit":
-            self._browser = self._pw.webkit.launch(headless=self._headless)
+            self._browser = self._pw.webkit.launch(headless=self._headless, slow_mo=slow_mo)
         else:
             launch_args = list(CHROMIUM_GPU_ARGS)
             if self._headless:
                 launch_args.append("--headless=new")
-            self._browser = self._pw.chromium.launch(headless=self._headless, args=launch_args)
+            self._browser = self._pw.chromium.launch(headless=self._headless, args=launch_args, slow_mo=slow_mo)
 
         logger.info("[%s] Browser launched (%s, headless=%s)", self._agent_id, b_type, self._headless)
 
@@ -311,6 +314,8 @@ class GameFlow:
             viewport=DEFAULT_VIEWPORT,
             locale=self._mkt_config.locale,
         )
+        if self._visual.show_cursor:
+            self._ctx_login.add_init_script(CURSOR_SCRIPT)
         page = self._ctx_login.new_page()
         lobby = LobbyPage(page=page, market=self._market, agent_id=self._agent_id, auth_state_dir=auth_dir)
         lobby.login(self._username, self._password)
@@ -336,6 +341,8 @@ class GameFlow:
             record_video_dir=str(video_dir),
             record_video_size=DEFAULT_VIEWPORT,
         )
+        if self._visual.show_cursor:
+            self._ctx_game.add_init_script(CURSOR_SCRIPT)  # the recorded video shows where the bot clicks
         if self._reused_session:
             apply_session_storage(self._ctx_game, self._auth_state_path)
         page = self._ctx_game.new_page()
@@ -438,7 +445,10 @@ class GameFlow:
         return None
 
     def close(self) -> None:
-        """Close browser contexts and browser."""
+        """Close browser contexts and browser (optionally after KEEP_OPEN_S so a human can look)."""
+        if self._visual.keep_open_s and self._browser is not None:
+            logger.info("[%s] Keeping the browser open for %ds (KEEP_OPEN_S)", self._agent_id, self._visual.keep_open_s)
+            time.sleep(self._visual.keep_open_s)
         self._monitor.detach()
         for ctx in (self._ctx_game, self._ctx_login):
             if ctx is not None:
