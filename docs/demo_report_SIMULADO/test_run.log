@@ -1,0 +1,96 @@
+*** SIMULACIÓN — DATOS FICTICIOS (no son resultados reales de Betsson) ***
+
+################################################################################
+                         TEST RUN LOG: SUITE FAILED
+################################################################################
+Summary: Total Reports: 4 | Total Checks: 42 | PASS: 40 | FAIL: 2 | ERROR: 0
+
+================================================================================
+SubAgent: agent_com_s1 | Market: COM | Scenario: 1 | Status: [PASS]
+Started:  2026-10-15T17:54:53.792817+00:00 | Finished: 2026-10-15T17:55:31.792817+00:00
+Evidence: docs/demo_report_SIMULADO/agent_com_s1/evidence
+--------------------------------------------------------------------------------
+CHECKS:
+  [PASS ] S1.01: Saldo Betsson antes legible
+  [PASS ] S1.02: Juego Pragmatic abierto en Real Play
+  [PASS ] S1.03: Moneda mostrada = mercado
+  [PASS ] S1.04: Apuesta y saldo in-game legibles
+  [PASS ] S1.08: Apuesta mostrada = apuesta usada
+  [PASS ] S1.05: El giro empezó
+  [PASS ] S1.06: El giro terminó
+  [PASS ] S1.05v: El juego reaccionó en pantalla
+  [PASS ] S1.07: No se disparó bonus/free spins
+  [PASS ] S1.09n: Servidor: saldo reconcilia (red)
+  [PASS ] S1.09: Saldo in-game reconcilia
+  [PASS ] S1.10: Saldo Betsson reconcilia
+  [PASS ] S1.11: Moneda de Betsson = mercado
+================================================================================
+
+================================================================================
+SubAgent: agent_com_s2 | Market: COM | Scenario: 2 | Status: [PASS]
+Started:  2026-10-15T17:55:33.792817+00:00 | Finished: 2026-10-15T17:56:11.792817+00:00
+Evidence: docs/demo_report_SIMULADO/agent_com_s2/evidence
+--------------------------------------------------------------------------------
+CHECKS:
+  [PASS ] S2.01: Precondición: saldo < apuesta
+  [PASS ] S2.02: El giro es rechazado (no hay giro pagado)
+  [PASS ] S2.03: Mensaje de saldo insuficiente visible
+  [PASS ] S2.04: Mensaje en el idioma del mercado
+  [PASS ] S2.05: Moneda mostrada = mercado
+  [PASS ] S2.06: Saldo in-game sin cambios
+  [PASS ] S2.06v: Saldo visible == saldo del servidor
+  [PASS ] S2.07: Saldo Betsson sin cambios
+================================================================================
+
+================================================================================
+SubAgent: agent_pe_s1 | Market: PE | Scenario: 1 | Status: [FAIL]
+Started:  2026-10-15T17:56:13.792817+00:00 | Finished: 2026-10-15T17:56:51.792817+00:00
+Evidence: docs/demo_report_SIMULADO/agent_pe_s1/evidence
+--------------------------------------------------------------------------------
+CHECKS:
+  [PASS ] S1.01: Saldo Betsson antes legible
+  [PASS ] S1.02: Juego Pragmatic abierto en Real Play
+  [PASS ] S1.03: Moneda mostrada = mercado
+  [PASS ] S1.04: Apuesta y saldo in-game legibles
+  [PASS ] S1.08: Apuesta mostrada = apuesta usada
+  [PASS ] S1.05: El giro empezó
+  [PASS ] S1.06: El giro terminó
+  [PASS ] S1.05v: El juego reaccionó en pantalla
+  [PASS ] S1.07: No se disparó bonus/free spins
+  [PASS ] S1.09n: Servidor: saldo reconcilia (red)
+  [FAIL ] S1.09: Saldo in-game reconcilia
+  [FAIL ] S1.10: Saldo Betsson reconcilia
+  [PASS ] S1.11: Moneda de Betsson = mercado
+--------------------------------------------------------------------------------
+FAILURE DIAGNOSTICS:
+  * Check [FAIL] S1.09 - Saldo in-game reconcilia:
+      Expected: 99.80
+      Observed: 100.00
+      Detail:   Reconciliation FAILED: expected = before (100.00) - bet (0.20) + prize (0.00) = 99.80; observed after = 100.00; diff = 0.20 (tolerance = 0.01)
+      Evidence: docs/demo_report_SIMULADO/agent_pe_s1/evidence
+  * Check [FAIL] S1.10 - Saldo Betsson reconcilia:
+      Expected: 99.80
+      Observed: 100.00
+      Detail:   Reconciliation FAILED: expected = before (100.00) - bet (0.20) + prize (0) = 99.80; observed after = 100.00; diff = 0.20 (tolerance = 0.01)
+      Evidence: docs/demo_report_SIMULADO/agent_pe_s1/evidence
+================================================================================
+
+================================================================================
+SubAgent: agent_pe_s2 | Market: PE | Scenario: 2 | Status: [PASS]
+Started:  2026-10-15T17:56:53.792817+00:00 | Finished: 2026-10-15T17:57:31.792817+00:00
+Evidence: docs/demo_report_SIMULADO/agent_pe_s2/evidence
+--------------------------------------------------------------------------------
+CHECKS:
+  [PASS ] S2.01: Precondición: saldo < apuesta
+  [PASS ] S2.02: El giro es rechazado (no hay giro pagado)
+  [PASS ] S2.03: Mensaje de saldo insuficiente visible
+  [PASS ] S2.04: Mensaje en el idioma del mercado
+  [PASS ] S2.05: Moneda mostrada = mercado
+  [PASS ] S2.06: Saldo in-game sin cambios
+  [PASS ] S2.06v: Saldo visible == saldo del servidor
+  [PASS ] S2.07: Saldo Betsson sin cambios
+================================================================================
+
+################################################################################
+FINAL VERDICT: SUITE FAILED
+################################################################################
