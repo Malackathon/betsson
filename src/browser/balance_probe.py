@@ -11,6 +11,7 @@ cannot see, so every script below walks open shadow roots recursively.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ PROBE_ATTRIBUTE = "data-balance-probe"
 HEADER_MAX_TOP_PX = 110
 HEADER_MAX_HEIGHT_PX = 70
 MAX_TEXT_LENGTH = 24
+POLL_MS = 300
 
 # Shared JS helpers: every element of the document, including those inside open shadow roots.
 _ALL_ELEMENTS_JS = r"""
@@ -109,19 +111,22 @@ def _header_text_sample(page: Any, limit: int = 12) -> list[str]:
 def find_balance_locator(page: Any, configured_selector: str, timeout_ms: int = 15_000) -> Any:
     """Locator of the balance element: the configured one if visible, else a header heuristic.
 
-    Raises ``LookupError`` when neither is found.
+    Polls both every ``POLL_MS`` until ``timeout_ms``; raises ``LookupError`` if neither shows up.
     """
     configured = page.locator(configured_selector).first
-    try:
-        configured.wait_for(state="visible", timeout=timeout_ms)
-        return configured
-    except Exception:
-        logger.info("Configured balance selector not visible; probing the header for a money-like element")
-
-    if page.evaluate(_PROBE_JS, [PROBE_ATTRIBUTE, HEADER_MAX_TOP_PX, HEADER_MAX_HEIGHT_PX, MAX_TEXT_LENGTH]):
-        probed = page.locator(f"[{PROBE_ATTRIBUTE}='1']").first
-        logger.info("Balance found by header probe (update 'balance_display' in config/markets.json)")
-        return probed
+    deadline = time.monotonic() + timeout_ms / 1000
+    while True:
+        try:
+            configured.wait_for(state="visible", timeout=POLL_MS)
+            return configured
+        except Exception:
+            pass
+        if page.evaluate(_PROBE_JS, [PROBE_ATTRIBUTE, HEADER_MAX_TOP_PX, HEADER_MAX_HEIGHT_PX, MAX_TEXT_LENGTH]):
+            logger.info("Balance found by header probe (update 'balance_display' in config/markets.json)")
+            return page.locator(f"[{PROBE_ATTRIBUTE}='1']").first
+        if time.monotonic() >= deadline:
+            break
+        page.wait_for_timeout(POLL_MS)
     raise LookupError(
         "No balance element found: configured selector absent and no money-like element in the header. "
         f"Header strings with digits/currency: {_header_text_sample(page)}. "

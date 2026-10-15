@@ -65,7 +65,7 @@ def _default_parse_money(raw: str, currency_hint: str | None = None) -> Decimal:
 
 
 _BALANCE_POLL_INTERVAL_S = 0.5
-_BALANCE_POLL_TIMEOUT_S = 15.0
+_BALANCE_POLL_TIMEOUT_S = 25.0
 _BALANCE_STABILITY_READS = 3
 _PAGE_LOAD_TIMEOUT_MS = 30_000
 _NAV_TIMEOUT_MS = 15_000
@@ -228,6 +228,14 @@ class LobbyPage:
 
     def _balance_locator(self, timeout_ms: int = _NAV_TIMEOUT_MS) -> Locator:
         """Configured balance element, or the header probe when the selector does not match."""
+        if self._balance_probed:
+            # Reuse the element already found by the probe: no re-search, no selector wait.
+            marked = self._page.locator(f"[{PROBE_ATTRIBUTE}='1']").first
+            try:
+                if marked.count() and marked.is_visible():
+                    return marked
+            except Exception:
+                pass
         wait = _PROBED_RECHECK_MS if self._balance_probed else timeout_ms
         locator = find_balance_locator(self._page, self._sel.balance_display, wait)
         self._balance_probed = locator.get_attribute(PROBE_ATTRIBUTE) == "1"
@@ -243,12 +251,15 @@ class LobbyPage:
     def read_balance_stable(self) -> Decimal:
         """Read Betsson balance, polling until value stabilizes (R10)."""
         logger.info("[%s] Polling balance until stable...", self._agent_id)
+        self._balance_locator()  # locating may take a while: do it before the stability clock starts
         start = time.monotonic()
         stable_count = 0
         last_value: Decimal | None = None
+        raw_reads: list[str] = []
 
         while (time.monotonic() - start) < _BALANCE_POLL_TIMEOUT_S:
             raw = self.read_balance_raw()
+            raw_reads.append(raw)
             try:
                 current = self._parse_money(raw, self._mkt.currency)
             except (ValueError, InvalidOperation) as exc:
@@ -272,7 +283,7 @@ class LobbyPage:
 
         raise TimeoutError(
             f"[{self._agent_id}] Balance did not stabilize within {_BALANCE_POLL_TIMEOUT_S}s. "
-            f"Last value: {last_value}"
+            f"Last value: {last_value}. Raw reads: {raw_reads[-10:]}"
         )
 
     def read_currency_from_header(self) -> str:
