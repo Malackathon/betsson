@@ -1,0 +1,153 @@
+name: E2E Validation (Betsson Challenge)
+
+# ==============================================================================
+# REGLA R2: DISPARO EXCLUSIVAMENTE MANUAL (workflow_dispatch)
+# NUNCA USAR 'push' NI 'pull_request'.
+# Cada ejecución de Escenario 1 gasta saldo real en el casino en vivo.
+# ==============================================================================
+on:
+  workflow_dispatch:
+    inputs:
+      market:
+        description: 'Mercado a validar (all, com, pe)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'com'
+          - 'pe'
+      scenario:
+        description: 'Escenario a ejecutar (all, 1, 2)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - '1'
+          - '2'
+      headless:
+        description: 'Ejecutar navegador en modo headless'
+        required: true
+        default: true
+        type: boolean
+
+# ==============================================================================
+# CONCURRENCY: No solapar ejecuciones para proteger el saldo y evitar conflictos
+# de sesión concurrentes en las cuentas de usuario (R2 / R12).
+# cancel-in-progress: false (NUNCA cancelar un giro en curso).
+# ==============================================================================
+concurrency:
+  group: e2e-validation-suite
+  cancel-in-progress: false
+
+# ==============================================================================
+# PLAN B POR GEOBLOQUEO / ANTIBOT (REGLA R3):
+# ------------------------------------------------------------------------------
+# Los runners estándar de GitHub Actions (IPs de centros de datos en EE. UU.)
+# pueden experimentar geobloqueo o desafíos Cloudflare/antibot en `betsson.pe`
+# (que exige IPs residenciales de Perú) o en `betsson.com`.
+#
+# Opciones de mitigación Plan B:
+#   1. Runner Self-Hosted: Configurar un runner propio en una máquina local con
+#      IP residencial o runner hosteado en la región adecuada:
+#      `runs-on: [self-hosted, linux]` o `runs-on: [self-hosted, windows]`
+#   2. Proxy SOCKS5 / Residencial: Configurar variables HTTP_PROXY, HTTPS_PROXY,
+#      ALL_PROXY apuntando a un proxy con geolocalización peruana / europea.
+#   3. Fallback a ejecución local: Ejecutar la suite completa en local con:
+#      `pytest -m e2e` o `python -m src.agents.orchestrator`
+#      y publicar los archivos `artifacts/report.html` y `report.md` resultantes.
+# ==============================================================================
+
+jobs:
+  e2e-test:
+    name: Run Betsson E2E Suite (${{ inputs.market }} - S${{ inputs.scenario }})
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Python 3.12 fijado para compatibilidad óptima con wheels de opencv y numpy (Sección 4)
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Playwright browsers and system dependencies
+        run: |
+          playwright install --with-deps chromium
+
+      - name: Execute E2E Tests (with soft checks)
+        id: run_e2e
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BETSSON_COM_S1_USER: ${{ secrets.BETSSON_COM_S1_USER }}
+          BETSSON_COM_S1_PASS: ${{ secrets.BETSSON_COM_S1_PASS }}
+          BETSSON_COM_S2_USER: ${{ secrets.BETSSON_COM_S2_USER }}
+          BETSSON_COM_S2_PASS: ${{ secrets.BETSSON_COM_S2_PASS }}
+          BETSSON_PE_S1_USER: ${{ secrets.BETSSON_PE_S1_USER }}
+          BETSSON_PE_S1_PASS: ${{ secrets.BETSSON_PE_S1_PASS }}
+          BETSSON_PE_S2_USER: ${{ secrets.BETSSON_PE_S2_USER }}
+          BETSSON_PE_S2_PASS: ${{ secrets.BETSSON_PE_S2_PASS }}
+          HEADLESS: ${{ inputs.headless }}
+          INPUT_MARKET: ${{ inputs.market }}
+          INPUT_SCENARIO: ${{ inputs.scenario }}
+        run: |
+          # Construcción del filtro de tests según inputs de dispatch
+          PYTEST_ARGS="-m e2e -ra"
+
+          if [ "$INPUT_SCENARIO" = "1" ]; then
+            PYTEST_ARGS="tests/test_scenario_1_spin.py $PYTEST_ARGS"
+          elif [ "$INPUT_SCENARIO" = "2" ]; then
+            PYTEST_ARGS="tests/test_scenario_2_no_funds.py $PYTEST_ARGS"
+          fi
+
+          if [ "$INPUT_MARKET" = "com" ]; then
+            PYTEST_ARGS="$PYTEST_ARGS -k com"
+          elif [ "$INPUT_MARKET" = "pe" ]; then
+            PYTEST_ARGS="$PYTEST_ARGS -k pe"
+          fi
+
+          echo "Ejecutando: pytest $PYTEST_ARGS"
+          pytest $PYTEST_ARGS
+
+      - name: Publish GitHub Step Summary
+        if: always()
+        run: |
+          python scripts/summary.py --artifacts-dir artifacts
+
+      # Checklist de seguridad: NUNCA subir auth_state ni tokens/credenciales
+      - name: Upload Test Reports and Evidence Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: betsson-e2e-artifacts
+          path: |
+            artifacts/master_report.json
+            artifacts/report.html
+            artifacts/report.md
+            artifacts/**/result_*.json
+            artifacts/**/evidence/**
+            artifacts/**/video/**
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Check E2E Run Status
+        if: always()
+        run: |
+          if [ "${{ steps.run_e2e.outcome }}" != "success" ]; then
+            echo "::error::E2E test execution completed with failed checks or test errors. See summary and HTML report."
+            exit 1
+          fi
+
