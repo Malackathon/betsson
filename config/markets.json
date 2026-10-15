@@ -1,0 +1,98 @@
+{
+  "com": {
+    "active": true,
+    "url": "https://www.betsson.com",
+    "casino_url": "https://www.betsson.com/en/casino",
+    "locale": "en",
+    "currency": "EUR",
+    "currency_symbol": "€",
+    "game_candidates": [
+      "Sweet Bonanza",
+      "Gates of Olympus",
+      "Big Bass Bonanza",
+      "The Dog House Megaways",
+      "Sugar Rush"
+    ],
+    "keywords_insufficient": [
+      "insufficient",
+      "funds",
+      "balance",
+      "not enough",
+      "low balance"
+    ],
+    "number_format": {
+      "decimal_sep": ".",
+      "thousands_sep": ","
+    },
+    "selectors": {
+      "login_button": "fdsp-button:has-text('Log in'), button:has-text('Log in'), .button-control_wrapper:has-text('Log in'), button[data-testid='header-login-button'], a:has-text('Log in')",
+      "username_input": "input#email-input, input[name='email'], input[data-testid='login-username'], input[name='username'], input#username",
+      "password_input": "input#password-input, input[name='password'], input[data-testid='login-password'], input#password",
+      "submit_login": "fdsp-button:has-text('Log in'), button[data-testid='login-submit'], button[type='submit']:has-text('Log in'), button:has-text('Log in')",
+      "balance_display": "[data-testid='balance-amount'], .balance-amount, .header-balance, .user-balance, .balance-display",
+      "currency_display": "[data-testid='balance-currency'], .balance-currency, .currency-symbol",
+      "search_input": "input[data-testid='search-game'], input[placeholder*='Search'], input[aria-label='Search'], input.search-input",
+      "game_card": "a.preview-item:has-text('{game_name}'), [data-testid='game-card-{game_name}'], .game-card:has-text('{game_name}'), a[title='{game_name}']",
+      "play_real_button": "button[data-testid='play-real'], button:has-text('Play'), button:has-text('Real Play'), a:has-text('Play')",
+      "game_iframe": "iframe[data-testid='game-iframe'], iframe.game-iframe, iframe[src*='pragmaticplay']",
+      "close_modal": "button[data-testid='close-modal'], button[aria-label='Close'], .modal-close, .close-button",
+      "cookie_accept": "#onetrust-accept-btn-handler, button[data-testid='cookie-accept'], button:has-text('Accept')"
+    },
+    "notes": [
+      "Spike finding: Betsson redirects to regional domain (e.g. betsson.es) when accessed from specific IPs (Spain); runner proxy or local execution needed if geoblocked (R3).",
+      "Authentication uses custom Web Components (fdsp-button) for login trigger and submission.",
+      "Login inputs are identified by name='email' (id='email-input') and name='password' (id='password-input').",
+      "OneTrust cookie banner must be accepted prior to interacting with header buttons.",
+      "Pragmatic Play games are rendered inside cross-origin iframes with no DOM access permitted (R9).",
+      "Game cards in casino lobby are structured as 'a.preview-item' containing game title and 'Pragmatic Play' provider label.",
+      "Balance display in Betsson header is accessible via DOM for verification (S1.01, S1.10, S2.07)."
+    ]
+  },
+  "pe": {
+    "active": false,
+    "url": "https://www.betsson.pe",
+    "casino_url": "https://www.betsson.pe/es/casino",
+    "locale": "es",
+    "currency": "PEN",
+    "currency_symbol": "S/",
+    "game_candidates": [
+      "Sweet Bonanza",
+      "Gates of Olympus",
+      "Big Bass Bonanza",
+      "The Dog House Megaways",
+      "Sugar Rush"
+    ],
+    "keywords_insufficient": [
+      "insuficiente",
+      "fondos",
+      "saldo",
+      "saldo insuficiente",
+      "saldo bajo"
+    ],
+    "number_format": {
+      "decimal_sep": ",",
+      "thousands_sep": "."
+    },
+    "selectors": {
+      "login_button": "fdsp-button:has-text('Iniciar sesión'), button:has-text('Iniciar sesión'), .button-control_wrapper:has-text('Iniciar sesión'), button[data-testid='header-login-button'], a:has-text('Iniciar sesión')",
+      "username_input": "input#email-input, input[name='email'], input[data-testid='login-username'], input[name='username'], input#username",
+      "password_input": "input#password-input, input[name='password'], input[data-testid='login-password'], input#password",
+      "submit_login": "fdsp-button:has-text('Iniciar sesión'), button[data-testid='login-submit'], button[type='submit']:has-text('Iniciar sesión'), button:has-text('Iniciar sesión')",
+      "balance_display": "[data-testid='balance-amount'], .balance-amount, .header-balance, .user-balance, .balance-display",
+      "currency_display": "[data-testid='balance-currency'], .balance-currency, .currency-symbol",
+      "search_input": "input[data-testid='search-game'], input[placeholder*='Buscar'], input[aria-label='Buscar'], input.search-input",
+      "game_card": "a.preview-item:has-text('{game_name}'), [data-testid='game-card-{game_name}'], .game-card:has-text('{game_name}'), a[title='{game_name}']",
+      "play_real_button": "button[data-testid='play-real'], button:has-text('Jugar'), button:has-text('Jugar en Real'), a:has-text('Jugar')",
+      "game_iframe": "iframe[data-testid='game-iframe'], iframe.game-iframe, iframe[src*='pragmaticplay']",
+      "close_modal": "button[data-testid='close-modal'], button[aria-label='Cerrar'], .modal-close, .close-button",
+      "cookie_accept": "#onetrust-accept-btn-handler, button[data-testid='cookie-accept'], button:has-text('Aceptar')"
+    },
+    "notes": [
+      "DEPRECATED: Peru (.pe) market is inactive per project requirements; testing scope restricted to .com pages only.",
+      "Spike finding: betsson.pe requires Peruvian IP / proxy to avoid geo-redirection (R3).",
+      "DOM structure and Web Components match betsson.com with Spanish localization (Iniciar sesión, Jugar).",
+      "Number format uses comma decimal separator (S/ 1.234,56) characteristic of Peruvian market.",
+      "Keywords for insufficient funds verification include: insuficiente, fondos, saldo, saldo bajo."
+    ]
+  }
+}
