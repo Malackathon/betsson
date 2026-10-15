@@ -28,6 +28,7 @@ from src.browser.game_canvas import (
 )
 from src.browser.lobby_page import LobbyPage
 from src.browser.selectors import get_market_selectors
+from src.browser.session_state import find_reusable_session
 from src.flows.spin_runner import SpinRun, run_spin_with_bonus_retry
 from src.network.models import RoundResult, SpinAttempt, SpinAttemptStatus
 from src.network.monitor import NetworkMonitor
@@ -126,6 +127,7 @@ class GameFlow:
         self._canvas: GameCanvas | None = None
         self._game_name: str = ""
         self._auth_state_path: Path | None = None
+        self._reused_session = False
 
     @property
     def monitor(self) -> NetworkMonitor:
@@ -296,6 +298,15 @@ class GameFlow:
         auth_dir = self._artifacts_dir.parent / _AUTH_STATE_DIR_NAME
         auth_dir.mkdir(parents=True, exist_ok=True)
 
+        reusable = find_reusable_session(self._artifacts_dir, self._agent_id)
+        if reusable is not None:
+            # A human logged in with scripts/save_session.py: skip the automated login, which
+            # the site's antifraud rejects. The session is verified once the game page loads.
+            self._auth_state_path = reusable
+            self._reused_session = True
+            logger.info("[%s] Reusing saved session %s (automated login skipped)", self._agent_id, reusable.name)
+            return
+
         self._ctx_login = self._browser.new_context(
             viewport=DEFAULT_VIEWPORT,
             locale=self._mkt_config.locale,
@@ -332,6 +343,8 @@ class GameFlow:
         self._lobby = LobbyPage(page=page, market=self._market, agent_id=self._agent_id, auth_state_dir=auth_dir)
 
         self._lobby.navigate_to_casino()
+        if self._reused_session:
+            self._lobby.assert_logged_in()
         self._game_name = self._lobby.search_and_open_game()
         if self._callbacks.on_game_opened:
             self._callbacks.on_game_opened(self._game_name)

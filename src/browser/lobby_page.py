@@ -141,6 +141,18 @@ class LobbyPage:
         """Return the path to saved auth state."""
         return self._auth_state_dir / f"auth_state_{self._agent_id}.json"
 
+    def assert_logged_in(self, timeout_ms: int = _PAGE_LOAD_TIMEOUT_MS) -> None:
+        """Fail fast, with the fix, when a reused saved session turned out expired or rejected."""
+        try:
+            self._page.locator(self._sel.balance_display).first.wait_for(state="visible", timeout=timeout_ms)
+        except Exception:
+            raise RuntimeError(
+                f"[{self._agent_id}] Logged-in header (balance) not found with the saved session: it may be "
+                f"expired/rejected, or the 'balance_display' selector in config/markets.json does not match this "
+                f"site. Re-save the session with: python scripts/save_session.py {self._agent_id}"
+            ) from None
+        self._logged_in = True
+
     def navigate_to_casino(self) -> None:
         """Navigate to casino lobby page."""
         logger.info("[%s] Navigating to casino: %s", self._agent_id, self._mkt.casino_url)
